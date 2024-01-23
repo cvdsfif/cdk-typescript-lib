@@ -1,7 +1,7 @@
 {
   "name": "cdk-typescript-lib",
   "version": "1.0.0-beta.1",
-  "description": "Implementing a generic typescript API interface on CDK",
+  "description": "Implementing generic typescript API interfaces on CDK",
   "main": "dist/index.cjs.js",
   "module": "dist/index.esm.js",
   "types": "dist/index.d.ts",
@@ -24,6 +24,7 @@
   ],
   "author": "Nikit Zykov <ch.destr@gmail.com>",
   "license": "ISC",
+  "dependencies": {},
   "devDependencies": {
     "@types/jest": "^29.5.11",
     "aws-cdk-lib": "^2.122.0",
