@@ -5,17 +5,17 @@ import { Architecture, Code, LayerVersion, Runtime } from "aws-cdk-lib/aws-lambd
 import { NodejsFunction, NodejsFunctionProps } from "aws-cdk-lib/aws-lambda-nodejs";
 import { LogGroup, LogGroupProps, RetentionDays } from "aws-cdk-lib/aws-logs";
 import { Construct } from "constructs";
-import { ApiMetadata } from "typizator";
+import { ApiDefinition, ApiMetadata } from "typizator";
 
 export interface ExtendedStackProps extends StackProps {
     deployFor: string
 }
 
-export type TSApiProperties = {
+export type TSApiProperties<T extends ApiDefinition> = {
     deployFor: string,
     apiName: string,
     description: string,
-    apiMetadata: ApiMetadata,
+    apiMetadata: ApiMetadata<T>,
     lambdaPath: string,
     lambdaProps?: NodejsFunctionProps,
     logGroupProps?: LogGroupProps,
@@ -27,20 +27,20 @@ export type TSApiProperties = {
 const camelToKebab = (src: string | String) => src.replace(/[A-Z]/g, match => `-${match.toLowerCase()}`);
 const kebabToCamel = (src: string | String) => src.replace(/(?:_|-| |\b)(\w)/g, (_, p1) => p1.toUpperCase());
 
-export class TSApiConstruct extends Construct {
+export class TSApiConstruct<T extends ApiDefinition> extends Construct {
     private DEFAULT_ARCHITECTURE = Architecture.ARM_64;
     private DEFAULT_RUNTIME = Runtime.NODEJS_20_X;
 
     private createLambdasForApi =
-        (
-            props: TSApiProperties,
+        <T extends ApiDefinition>(
+            props: TSApiProperties<T>,
             subPath: string,
-            apiMetadata: ApiMetadata,
+            apiMetadata: ApiMetadata<T>,
             httpApi: HttpApi,
             sharedLayer: LayerVersion
         ) => {
             for (const [key, data] of apiMetadata.members) {
-                const keyKebabCase = camelToKebab(key);
+                const keyKebabCase = camelToKebab(key as string);
                 if (data.dataType === "api")
                     this.createLambdasForApi(props, `${subPath}/${keyKebabCase}`, data, httpApi, sharedLayer);
                 else {
@@ -58,7 +58,7 @@ export class TSApiConstruct extends Construct {
                         {
                             entry: `${filePath}.ts`,
                             handler: key as string,
-                            description: `${props.description} - ${subPath}/${key} (${props.deployFor})`,
+                            description: `${props.description} - ${subPath}/${key as string} (${props.deployFor})`,
                             runtime: this.DEFAULT_RUNTIME,
                             memorySize: 256,
                             architecture: this.DEFAULT_ARCHITECTURE,
@@ -85,7 +85,7 @@ export class TSApiConstruct extends Construct {
             }
         }
 
-    constructor(scope: Construct, id: string, props: TSApiProperties) {
+    constructor(scope: Construct, id: string, props: TSApiProperties<T>) {
         super(scope, id);
 
         const httpApi = new HttpApi(this, `ProxyCorsHttpApi-${props.apiName}-${props.deployFor}`, {

@@ -1,7 +1,7 @@
 import { App, Stack } from "aws-cdk-lib";
 import { Match, Template } from "aws-cdk-lib/assertions";
 import { Construct } from "constructs";
-import { apiS, bigintS, stringS } from "typizator";
+import { ApiDefinition, apiS, bigintS, stringS } from "typizator";
 import { ExtendedStackProps, TSApiConstruct, TSApiProperties } from "../src/ts-api-construct";
 import { Runtime } from "aws-cdk-lib/aws-lambda";
 import { RetentionDays } from "aws-cdk-lib/aws-logs";
@@ -16,12 +16,12 @@ describe("Testing the behaviour of the Typescript API construct for CDK", () => 
         }
     });
 
-    class TestStack extends Stack {
+    class TestStack<T extends ApiDefinition> extends Stack {
         constructor(
             scope: Construct,
             id: string,
             props: ExtendedStackProps,
-            apiProps: TSApiProperties
+            apiProps: TSApiProperties<T>
         ) {
             super(scope, id, props);
             new TSApiConstruct(this, "SimpleApi", apiProps);
