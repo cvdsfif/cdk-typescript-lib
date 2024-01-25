@@ -32,7 +32,7 @@ export class TSApiConstruct<T extends ApiDefinition> extends Construct {
     private DEFAULT_RUNTIME = Runtime.NODEJS_20_X;
 
     private createLambdasForApi =
-        <T extends ApiDefinition>(
+        (
             props: TSApiProperties<T>,
             subPath: string,
             apiMetadata: ApiMetadata<T>,
