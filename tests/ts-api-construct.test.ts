@@ -124,18 +124,15 @@ describe("Testing the behaviour of the Typescript API construct for CDK", () => 
                 "Architectures": ["arm64"],
                 "MemorySize": 256,
                 "Runtime": "nodejs20.x",
-                "Timeout": 60
+                "Timeout": 60,
+                "LoggingConfig": {
+                    "LogGroup": { "Ref": Match.stringLikeRegexp("Meow") }
+                }
             })
         );
         template.hasResourceProperties("AWS::Logs::LogGroup",
             Match.objectLike({
-                "RetentionInDays": 3,
-                "LogGroupName": {
-                    "Fn::Join": [
-                        "",
-                        ["/aws/lambda/", { "Ref": Match.stringLikeRegexp("Meow") }]
-                    ]
-                }
+                "RetentionInDays": 3
             })
         );
 
@@ -162,18 +159,35 @@ describe("Testing the behaviour of the Typescript API construct for CDK", () => 
         template.hasResourceProperties("AWS::Lambda::Function",
             Match.objectLike({
                 "Description": "Test Typescript API - /meow (staging)",
-                "Runtime": "nodejs18.x"
+                "Runtime": "nodejs18.x",
+                "LoggingConfig": {
+                    "LogGroup": { "Ref": Match.stringLikeRegexp("Meow") }
+                }
             })
         );
         template.hasResourceProperties("AWS::Logs::LogGroup",
             Match.objectLike({
-                "RetentionInDays": 5,
-                "LogGroupName": {
-                    "Fn::Join": [
-                        "",
-                        ["/aws/lambda/", { "Ref": Match.stringLikeRegexp("Meow") }]
-                    ]
-                }
+                "RetentionInDays": 5
+            })
+        );
+    });
+
+    test("Should add a shared layer to lambdas", () => {
+        template.hasResourceProperties("AWS::Lambda::Function",
+            Match.objectLike({
+                "Description": "Test Typescript API - /meow (test)",
+                "Layers": [{ "Ref": Match.stringLikeRegexp("SimpleApiSharedLayer") }]
+            })
+        );
+        template.hasResourceProperties("AWS::Lambda::Function",
+            Match.objectLike({
+                "Description": "Test Typescript API - /noMeow (test)",
+                "Layers": [{ "Ref": Match.stringLikeRegexp("SimpleApiSharedLayer") }]
+            })
+        );
+        template.hasResourceProperties("AWS::Lambda::LayerVersion",
+            Match.objectLike({
+                "CompatibleRuntimes": ["nodejs20.x"]
             })
         );
     });

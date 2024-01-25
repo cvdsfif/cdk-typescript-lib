@@ -1,7 +1,7 @@
-import { CfnOutput, Duration, RemovalPolicy, StackProps } from "aws-cdk-lib";
+import { BundlingOptions, CfnOutput, Duration, RemovalPolicy, StackProps } from "aws-cdk-lib";
 import { CorsHttpMethod, HttpApi, HttpMethod } from "aws-cdk-lib/aws-apigatewayv2";
 import { HttpLambdaIntegration } from "aws-cdk-lib/aws-apigatewayv2-integrations";
-import { Architecture, Runtime } from "aws-cdk-lib/aws-lambda";
+import { Architecture, Code, LayerVersion, Runtime } from "aws-cdk-lib/aws-lambda";
 import { NodejsFunction, NodejsFunctionProps } from "aws-cdk-lib/aws-lambda-nodejs";
 import { LogGroup, LogGroupProps, RetentionDays } from "aws-cdk-lib/aws-logs";
 import { Construct } from "constructs";
@@ -18,27 +18,40 @@ export type TSApiProperties = {
     apiMetadata: ApiMetadata,
     lambdaPath: string,
     lambdaProps?: NodejsFunctionProps,
-    logGroupProps?: LogGroupProps
+    logGroupProps?: LogGroupProps,
+    sharedLayerPath?: string,
+    extraLayers?: LayerVersion[],
+    extraBundling?: BundlingOptions
 }
 
 const camelToKebab = (src: string | String) => src.replace(/[A-Z]/g, match => `-${match.toLowerCase()}`);
-const kebabToCamel = (src: string | String) => src.replace(/(?:_|-| |\b)(\w)/g, (_, p1) => p1.toUpperCase())
+const kebabToCamel = (src: string | String) => src.replace(/(?:_|-| |\b)(\w)/g, (_, p1) => p1.toUpperCase());
 
 export class TSApiConstruct extends Construct {
+    private DEFAULT_ARCHITECTURE = Architecture.ARM_64;
+    private DEFAULT_RUNTIME = Runtime.NODEJS_20_X;
+
     private createLambdasForApi =
         (
             props: TSApiProperties,
             subPath: string,
             apiMetadata: ApiMetadata,
-            httpApi: HttpApi
+            httpApi: HttpApi,
+            sharedLayer: LayerVersion
         ) => {
             for (const [key, data] of apiMetadata.members) {
                 const keyKebabCase = camelToKebab(key);
                 if (data.dataType === "api")
-                    this.createLambdasForApi(props, `${subPath}/${keyKebabCase}`, data, httpApi);
+                    this.createLambdasForApi(props, `${subPath}/${keyKebabCase}`, data, httpApi, sharedLayer);
                 else {
                     const filePath = `${props.lambdaPath}${subPath}/${keyKebabCase}`;
                     const camelCasePath = kebabToCamel(filePath.replace("/", "-"));
+                    const logGroup = new LogGroup(this, `TSApiLambdaLog-${camelCasePath}`, {
+                        //logGroupName: `/aws/lambda/${lambda.functionName}`,
+                        removalPolicy: RemovalPolicy.DESTROY,
+                        retention: RetentionDays.THREE_DAYS,
+                        ...props.logGroupProps
+                    });
                     const lambda = new NodejsFunction(
                         this,
                         `TSApiLambda-${camelCasePath}`,
@@ -46,13 +59,16 @@ export class TSApiConstruct extends Construct {
                             entry: `${filePath}.ts`,
                             handler: key as string,
                             description: `${props.description} - ${subPath}/${key} (${props.deployFor})`,
-                            runtime: Runtime.NODEJS_20_X,
+                            runtime: this.DEFAULT_RUNTIME,
                             memorySize: 256,
-                            architecture: Architecture.ARM_64,
+                            architecture: this.DEFAULT_ARCHITECTURE,
                             timeout: Duration.seconds(60),
+                            logGroup,
+                            layers: [sharedLayer, ...(props.extraLayers ?? [])],
                             bundling: {
                                 minify: true,
-                                sourceMap: true
+                                sourceMap: true,
+                                ...(props.extraBundling ?? {})
                             },
                             ...props.lambdaProps
                         });
@@ -65,12 +81,6 @@ export class TSApiConstruct extends Construct {
                         methods: [HttpMethod.POST],
                         path: `${subPath}/${keyKebabCase}`
                     });
-                    new LogGroup(this, `TSApiLambdaLog-${camelCasePath}`, {
-                        logGroupName: `/aws/lambda/${lambda.functionName}`,
-                        removalPolicy: RemovalPolicy.DESTROY,
-                        retention: RetentionDays.THREE_DAYS,
-                        ...props.logGroupProps
-                    });
                 }
             }
         }
@@ -82,7 +92,13 @@ export class TSApiConstruct extends Construct {
             corsPreflight: { allowMethods: [CorsHttpMethod.ANY], allowOrigins: ['*'], allowHeaders: ['*'] },
         });
 
-        this.createLambdasForApi(props, "", props.apiMetadata, httpApi);
+        const sharedLayer = new LayerVersion(this, `SharedLayer-${props.apiName}-${props.deployFor}`, {
+            code: Code.fromAsset(props.sharedLayerPath ?? `${props.lambdaPath}/shared-layer`),
+            compatibleArchitectures: [props.lambdaProps?.architecture ?? this.DEFAULT_ARCHITECTURE],
+            compatibleRuntimes: [props.lambdaProps?.runtime ?? this.DEFAULT_RUNTIME]
+        })
+
+        this.createLambdasForApi(props, "", props.apiMetadata, httpApi, sharedLayer);
 
         new CfnOutput(this, `${props.apiName}URL`, { value: httpApi.url! });
     }
