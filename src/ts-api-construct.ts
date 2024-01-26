@@ -1,8 +1,8 @@
-import { BundlingOptions, CfnOutput, Duration, RemovalPolicy, StackProps } from "aws-cdk-lib";
+import { CfnOutput, Duration, RemovalPolicy, StackProps } from "aws-cdk-lib";
 import { CorsHttpMethod, HttpApi, HttpMethod } from "aws-cdk-lib/aws-apigatewayv2";
 import { HttpLambdaIntegration } from "aws-cdk-lib/aws-apigatewayv2-integrations";
 import { Architecture, Code, LayerVersion, Runtime } from "aws-cdk-lib/aws-lambda";
-import { NodejsFunction, NodejsFunctionProps } from "aws-cdk-lib/aws-lambda-nodejs";
+import { BundlingOptions, NodejsFunction, NodejsFunctionProps } from "aws-cdk-lib/aws-lambda-nodejs";
 import { LogGroup, LogGroupProps, RetentionDays } from "aws-cdk-lib/aws-logs";
 import { Construct } from "constructs";
 import { ApiDefinition, ApiMetadata } from "typizator";
