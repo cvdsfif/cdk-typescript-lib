@@ -1,4 +1,4 @@
-import { CfnOutput, Duration, RemovalPolicy, StackProps } from "aws-cdk-lib";
+import { Duration, RemovalPolicy, StackProps } from "aws-cdk-lib";
 import { CorsHttpMethod, HttpApi, HttpMethod } from "aws-cdk-lib/aws-apigatewayv2";
 import { HttpLambdaIntegration } from "aws-cdk-lib/aws-apigatewayv2-integrations";
 import { Architecture, Code, LayerVersion, Runtime } from "aws-cdk-lib/aws-lambda";
@@ -27,22 +27,27 @@ export type TSApiProperties<T extends ApiDefinition> = {
 const camelToKebab = (src: string | String) => src.replace(/[A-Z]/g, match => `-${match.toLowerCase()}`);
 const kebabToCamel = (src: string | String) => src.replace(/(?:_|-| |\b)(\w)/g, (_, p1) => p1.toUpperCase());
 
+export type ApiLambdas<T extends ApiDefinition> = {
+    [K in keyof T]: T[K] extends ApiDefinition ? ApiLambdas<T[K]> : NodejsFunction
+}
+
 export class TSApiConstruct<T extends ApiDefinition> extends Construct {
     private DEFAULT_ARCHITECTURE = Architecture.ARM_64;
     private DEFAULT_RUNTIME = Runtime.NODEJS_20_X;
 
     private createLambdasForApi =
-        (
-            props: TSApiProperties<T>,
+        <R extends ApiDefinition>(
+            props: TSApiProperties<R>,
             subPath: string,
-            apiMetadata: ApiMetadata<T>,
+            apiMetadata: ApiMetadata<R>,
             httpApi: HttpApi,
             sharedLayer: LayerVersion
         ) => {
+            const lambdas = {} as ApiLambdas<R>
             for (const [key, data] of apiMetadata.members) {
                 const keyKebabCase = camelToKebab(key as string);
                 if (data.dataType === "api")
-                    this.createLambdasForApi(props, `${subPath}/${keyKebabCase}`, data, httpApi, sharedLayer);
+                    (lambdas as any)[key] = this.createLambdasForApi(props, `${subPath}/${keyKebabCase}`, data, httpApi, sharedLayer);
                 else {
                     const filePath = `${props.lambdaPath}${subPath}/${keyKebabCase}`;
                     const camelCasePath = kebabToCamel(filePath.replace("/", "-"));
@@ -71,6 +76,7 @@ export class TSApiConstruct<T extends ApiDefinition> extends Construct {
                             },
                             ...props.lambdaProps
                         });
+                    (lambdas as any)[key] = lambda;
                     const lambdaIntegration = new HttpLambdaIntegration(
                         `Integration-${props.lambdaPath}-${keyKebabCase}-${subPath.replace("/", "-")}-${props.deployFor}`,
                         lambda
@@ -82,12 +88,16 @@ export class TSApiConstruct<T extends ApiDefinition> extends Construct {
                     });
                 }
             }
+            return lambdas;
         }
+
+    readonly httpApi: HttpApi;
+    readonly lambdas: ApiLambdas<T>;
 
     constructor(scope: Construct, id: string, props: TSApiProperties<T>) {
         super(scope, id);
 
-        const httpApi = new HttpApi(this, `ProxyCorsHttpApi-${props.apiName}-${props.deployFor}`, {
+        this.httpApi = new HttpApi(this, `ProxyCorsHttpApi-${props.apiName}-${props.deployFor}`, {
             corsPreflight: { allowMethods: [CorsHttpMethod.ANY], allowOrigins: ['*'], allowHeaders: ['*'] },
         });
 
@@ -97,8 +107,6 @@ export class TSApiConstruct<T extends ApiDefinition> extends Construct {
             compatibleRuntimes: [props.lambdaProps?.runtime ?? this.DEFAULT_RUNTIME]
         })
 
-        this.createLambdasForApi(props, "", props.apiMetadata, httpApi, sharedLayer);
-
-        new CfnOutput(this, `${props.apiName}URL`, { value: httpApi.url! });
+        this.lambdas = this.createLambdasForApi(props, "", props.apiMetadata, this.httpApi, sharedLayer);
     }
 }
