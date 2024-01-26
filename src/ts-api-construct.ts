@@ -21,7 +21,7 @@ export type TSApiProperties<T extends ApiDefinition> = {
     logGroupProps?: LogGroupProps,
     sharedLayerPath?: string,
     extraLayers?: LayerVersion[],
-    extraBundling?: BundlingOptions
+    extraBundling?: Partial<BundlingOptions>
 }
 
 const camelToKebab = (src: string | String) => src.replace(/[A-Z]/g, match => `-${match.toLowerCase()}`);
@@ -47,7 +47,6 @@ export class TSApiConstruct<T extends ApiDefinition> extends Construct {
                     const filePath = `${props.lambdaPath}${subPath}/${keyKebabCase}`;
                     const camelCasePath = kebabToCamel(filePath.replace("/", "-"));
                     const logGroup = new LogGroup(this, `TSApiLambdaLog-${camelCasePath}`, {
-                        //logGroupName: `/aws/lambda/${lambda.functionName}`,
                         removalPolicy: RemovalPolicy.DESTROY,
                         retention: RetentionDays.THREE_DAYS,
                         ...props.logGroupProps
