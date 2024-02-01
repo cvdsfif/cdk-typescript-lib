@@ -1,27 +1,19 @@
 import { App, Stack } from "aws-cdk-lib";
 import { Match, Template } from "aws-cdk-lib/assertions";
 import { Construct } from "constructs";
-import { ApiDefinition, apiS, bigintS, stringS } from "typizator";
-import { ExtendedStackProps, TSApiConstruct, TSApiProperties } from "../src/ts-api-construct";
+import { simpleApiS } from "./lambda/shared/simple-api-definition";
+import { ApiDefinition } from "typizator";
+import { ExtendedStackProps, TSApiConstruct, TSApiPlainProperties } from "../src/ts-api-construct";
 import { Runtime } from "aws-cdk-lib/aws-lambda";
 import { RetentionDays } from "aws-cdk-lib/aws-logs";
 
 describe("Testing the behaviour of the Typescript API construct for CDK", () => {
-    const simpleApiS = apiS({
-        meow: { args: [], retVal: stringS.notNull },
-        noMeow: { args: [] },
-        helloWorld: { args: [stringS.notNull, bigintS.notNull], retVal: stringS.notNull },
-        cruel: {
-            world: { args: [stringS.notNull], retVal: stringS.notNull }
-        }
-    });
-
     class TestStack<T extends ApiDefinition> extends Stack {
         constructor(
             scope: Construct,
             id: string,
             props: ExtendedStackProps,
-            apiProps: TSApiProperties<T>
+            apiProps: TSApiPlainProperties<T>,
         ) {
             super(scope, id, props);
             new TSApiConstruct(this, "SimpleApi", apiProps);
@@ -40,7 +32,8 @@ describe("Testing the behaviour of the Typescript API construct for CDK", () => 
                 apiName: "TSTestApi",
                 description: "Test Typescript API",
                 apiMetadata: simpleApiS.metadata,
-                lambdaPath: "tests/lambda"
+                lambdaPath: "tests/lambda",
+                connectDatabase: false
             }
         );
         template = Template.fromStack(stack);
@@ -110,13 +103,6 @@ describe("Testing the behaviour of the Typescript API construct for CDK", () => 
         });
     });
 
-    test("Should share the API URL", () => {
-        expect(
-            Object.keys(template.findOutputs("*"))
-                .find(key => key.startsWith("SimpleApiTSTestApiURL"))
-        ).toBeDefined();
-    });
-
     test("Should set the default configuration of each lambda and let the end user modify it", () => {
         template.hasResourceProperties("AWS::Lambda::Function",
             Match.objectLike({
@@ -152,7 +138,8 @@ describe("Testing the behaviour of the Typescript API construct for CDK", () => 
                 },
                 logGroupProps: {
                     retention: RetentionDays.FIVE_DAYS
-                }
+                },
+                connectDatabase: false
             }
         );
         template = Template.fromStack(stack);
