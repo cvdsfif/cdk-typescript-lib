@@ -189,7 +189,7 @@ export class TSApiConstruct<T extends ApiDefinition> extends Construct {
         });
 
         if (props.connectDatabase) {
-            const vpc = this.vpc = new Vpc(this, `VPC-${props.apiName}-${props.deployFor}`, { natGateways: 1, maxAzs: 1 });
+            const vpc = this.vpc = new Vpc(this, `VPC-${props.apiName}-${props.deployFor}`, { natGateways: 1 });
             this.databaseSG = new SecurityGroup(this, `SG-${props.apiName}-${props.deployFor}`, { vpc });
             this.database = new DatabaseInstance(this, `DB-${props.apiName}-${props.deployFor}`, {
                 engine: DatabaseInstanceEngine.postgres({ version: PostgresEngineVersion.VER_16 }),
