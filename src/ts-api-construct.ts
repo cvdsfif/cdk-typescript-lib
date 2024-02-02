@@ -198,7 +198,8 @@ export class TSApiConstruct<T extends ApiDefinition> extends Construct {
                 vpc: this.vpc,
                 securityGroups: [this.databaseSG],
                 credentials: Credentials.fromGeneratedSecret("postgres"),
-                maxAllocatedStorage: 20
+                allocatedStorage: 10,
+                maxAllocatedStorage: 50
             });
         }
 
