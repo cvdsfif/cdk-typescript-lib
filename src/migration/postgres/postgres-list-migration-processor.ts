@@ -1,5 +1,5 @@
 import { DatabaseConnection } from "typizator-handler";
-import { MigrationProcessor, MigrationResultFailure, MigrationResultSuccess } from "../migration-handler";
+import { MigrationProcessor, MigrationResultFailure, MigrationResultSuccess } from "./postgres-migration-handler";
 import { boolS, dateS, intS, objectS, stringS } from "typizator";
 import { generateCreateStatement } from "./generate-create-statement";
 import { MigrationList } from "../migration-list";
@@ -14,7 +14,12 @@ export const databaseMigrationSchema = objectS({
 });
 
 export class PostgresListMigrationProcessor implements MigrationProcessor {
-    constructor(private migrationList: MigrationList, private _migrationTableName = "migration_log") { }
+    static DEFAULT_MIGRATION_TABLE_NAME = "migration_log";
+
+    constructor(
+        private migrationList: MigrationList,
+        private _migrationTableName = PostgresListMigrationProcessor.DEFAULT_MIGRATION_TABLE_NAME
+    ) { }
 
     get migrationTableName() { return this._migrationTableName };
 

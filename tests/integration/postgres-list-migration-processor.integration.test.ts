@@ -1,7 +1,7 @@
 import { Client } from "pg"
 import { PostgreSqlContainer } from "@testcontainers/postgresql"
 import { DatabaseConnection, connectDatabase } from "typizator-handler"
-import { MigrationProcessor } from "../../src/migration/migration-handler"
+import { MigrationProcessor } from "../../src/migration/postgres/postgres-migration-handler"
 import { PostgresListMigrationProcessor, databaseMigrationSchema } from "../../src/migration/postgres/postgres-list-migration-processor";
 import { migrationList } from "../../src/migration/migration-list";
 import { extendExpectWithToContainStrings } from "../util/expect-contain-strings";

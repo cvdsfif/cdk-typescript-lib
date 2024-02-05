@@ -19,8 +19,8 @@ jest.mock("pg", () => ({
 }))
 
 import { DatabaseConnection } from "typizator-handler"
-import { MigrationResultFailure, MigrationResultSuccess, migrationHandler } from "../../src/migration/migration-handler"
-import { CloudFormationCustomResourceEventCommon } from "../../src/lib/cloud-formation-types"
+import { MigrationResultFailure, MigrationResultSuccess, postgresMigrationHandler } from "../../../src/migration/postgres/postgres-migration-handler"
+import { CloudFormationCustomResourceEventCommon } from "../../../src/lib/cloud-formation-types"
 
 describe("Test the migration handlers functionality", () => {
     let migrationTestResult: MigrationResultSuccess | MigrationResultFailure;
@@ -28,7 +28,7 @@ describe("Test the migration handlers functionality", () => {
     let throwRequired = false;
     let throwRequiredOnCreate = false;
 
-    const underTest = migrationHandler({
+    const underTest = postgresMigrationHandler({
         initialize: async (db: DatabaseConnection) => {
             if (throwRequiredOnCreate) throw new Error("Test error")
             db.query("Initialize")

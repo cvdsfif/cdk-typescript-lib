@@ -73,6 +73,7 @@ export class TSApiConstruct<T extends ApiDefinition> extends Construct {
                 ...lambdaProps,
                 vpc: this.vpc,
                 securityGroups: [lambdaSG],
+
                 environment: {
                     DB_ENDPOINT_ADDRESS: this.database!.dbInstanceEndpointAddress,
                     DB_NAME: props.databaseName,

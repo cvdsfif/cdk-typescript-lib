@@ -1,5 +1,5 @@
 import { ConnectedResources, DatabaseConnection, connectDatabase, connectPostgresDb } from "typizator-handler"
-import { CdkCustomResourceResponse, CloudFormationCustomResourceEvent, CloudFormationCustomResourceResponse } from "../lib/cloud-formation-types"
+import { CdkCustomResourceResponse, CloudFormationCustomResourceEvent, CloudFormationCustomResourceResponse } from "../../lib/cloud-formation-types"
 
 export type MigrationResultSuccess = {
     successful: true,
@@ -62,7 +62,7 @@ const migrationUpdate = async (
     return successResponse(`Last migration: ${result.lastSuccessful}`, eventResourceId, event)
 }
 
-export const migrationHandler =
+export const postgresMigrationHandler =
     (migrationProcessor: MigrationProcessor):
         (event: CloudFormationCustomResourceEvent) => Promise<CdkCustomResourceResponse> => {
         const fn = async (event: CloudFormationCustomResourceEvent) => {
