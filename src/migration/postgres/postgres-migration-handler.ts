@@ -88,6 +88,7 @@ export const postgresMigrationHandler =
                     event)
             }
         }
-        fn.isMigrationHandler = true;
+        fn.isMigrationHandler = true
+        fn.connectedResources = [ConnectedResources.DATABASE]
         return fn;
     }

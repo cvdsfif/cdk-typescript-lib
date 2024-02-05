@@ -1,14 +1,16 @@
-import { Duration, RemovalPolicy, StackProps } from "aws-cdk-lib";
+import { CustomResource, Duration, RemovalPolicy, StackProps } from "aws-cdk-lib";
 import { CorsHttpMethod, HttpApi, HttpMethod } from "aws-cdk-lib/aws-apigatewayv2";
 import { HttpLambdaIntegration } from "aws-cdk-lib/aws-apigatewayv2-integrations";
 import { ISecurityGroup, InstanceClass, InstanceSize, InstanceType, Port, SecurityGroup, Vpc } from "aws-cdk-lib/aws-ec2";
 import { Architecture, Code, LayerVersion, Runtime } from "aws-cdk-lib/aws-lambda";
 import { BundlingOptions, NodejsFunction, NodejsFunctionProps } from "aws-cdk-lib/aws-lambda-nodejs";
 import { LogGroup, LogGroupProps, RetentionDays } from "aws-cdk-lib/aws-logs";
-import { Credentials, DatabaseInstance, DatabaseInstanceEngine, PostgresEngineVersion } from "aws-cdk-lib/aws-rds";
+import { Credentials, DatabaseInstance, DatabaseInstanceEngine, DatabaseInstanceProps, PostgresEngineVersion } from "aws-cdk-lib/aws-rds";
 import { Construct } from "constructs";
 import { ApiDefinition, ApiMetadata } from "typizator";
 import { ConnectedResources, PING } from "typizator-handler";
+import { Provider } from "aws-cdk-lib/custom-resources";
+import { readFileSync } from "fs";
 
 export interface ExtendedStackProps extends StackProps {
     deployFor: string
@@ -33,7 +35,9 @@ export type TSApiPlainProperties<T extends ApiDefinition> = TSApiProperties<T> &
 
 export type TSApiDatabaseProperties<T extends ApiDefinition> = TSApiProperties<T> & {
     connectDatabase: true,
-    databaseName: string
+    migrationLambda?: string,
+    migrationLambdaPath?: string,
+    dbProps: Partial<Omit<DatabaseInstanceProps, "databaseName">> & { databaseName: string }
 }
 
 const camelToKebab = (src: string | String) => src.replace(/[A-Z]/g, match => `-${match.toLowerCase()}`);
@@ -41,10 +45,10 @@ const kebabToCamel = (src: string | String) => src.replace(/(?:_|-| |\b)(\w)/g, 
 
 const requireHereAndUp: any = (path: string, level = 0) => {
     try {
-        return require(path);
+        return require(path)
     } catch (e) {
-        if (level > 8) throw new Error(`Handler not found, searching up to ${path}`);
-        return requireHereAndUp(`../${path}`, level + 1);
+        if (level > 8) throw new Error(`Handler not found, searching up to ${path}`)
+        return requireHereAndUp(`../${path}`, level + 1)
     }
 }
 
@@ -76,7 +80,7 @@ export class TSApiConstruct<T extends ApiDefinition> extends Construct {
 
                 environment: {
                     DB_ENDPOINT_ADDRESS: this.database!.dbInstanceEndpointAddress,
-                    DB_NAME: props.databaseName,
+                    DB_NAME: props.dbProps.databaseName,
                     DB_SECRET_ARN: this.database!.secret?.secretFullArn
                 },
             } as NodejsFunctionProps;
@@ -97,6 +101,59 @@ export class TSApiConstruct<T extends ApiDefinition> extends Construct {
             )
         }
 
+    private createLambda = <R extends ApiDefinition>(
+        props: TSApiPlainProperties<R> | TSApiDatabaseProperties<R>,
+        subPath: string,
+        sharedLayer: LayerVersion,
+        key: string,
+        filePath: string
+    ) => {
+        const handler = requireHereAndUp(`${filePath}`)[key];
+        const resourcesConnected = handler?.connectedResources;
+        if (!resourcesConnected) throw new Error(`No appropriate handler connected for ${filePath}`);
+        if (!props.connectDatabase && Array.from(resourcesConnected).includes(ConnectedResources.DATABASE.toString()))
+            throw new Error(`Trying to connect database to a lambda on a non-connected stack in ${filePath}`);
+
+        const camelCasePath = kebabToCamel(filePath.replace("/", "-"));
+
+        const logGroup = new LogGroup(this, `TSApiLambdaLog-${camelCasePath}${props.deployFor}`, {
+            removalPolicy: RemovalPolicy.DESTROY,
+            retention: RetentionDays.THREE_DAYS,
+            ...props.logGroupProps
+        });
+
+        let lambdaProperties = {
+            entry: `${filePath}.ts`,
+            handler: key as string,
+            description: `${props.description} - ${subPath}/${key as string} (${props.deployFor})`,
+            runtime: this.DEFAULT_RUNTIME,
+            memorySize: 256,
+            architecture: this.DEFAULT_ARCHITECTURE,
+            timeout: Duration.seconds(60),
+            logGroup,
+            layers: [sharedLayer, ...(props.extraLayers ?? [])],
+            bundling: {
+                minify: true,
+                sourceMap: true,
+                ...(props.extraBundling ?? {})
+            },
+            ...props.lambdaProps
+        } as NodejsFunctionProps;
+        if (props.connectDatabase)
+            lambdaProperties = this.addDatabaseProperties(props, lambdaProperties, camelCasePath);
+
+        const lambda = new NodejsFunction(
+            this,
+            `TSApiLambda-${camelCasePath}`,
+            lambdaProperties
+        );
+
+        if (props.connectDatabase)
+            this.connectLambdaToDatabase(lambda, lambdaProperties.securityGroups![0], props, camelCasePath);
+
+        return lambda
+    }
+
     private connectLambda =
         <R extends ApiDefinition>(
             props: TSApiPlainProperties<R> | TSApiDatabaseProperties<R>,
@@ -107,48 +164,7 @@ export class TSApiConstruct<T extends ApiDefinition> extends Construct {
             keyKebabCase: string
         ) => {
             const filePath = `${props.lambdaPath}${subPath}/${keyKebabCase}`;
-            const handler = requireHereAndUp(`${filePath}`)[key];
-            const resourcesConnected = handler?.connectedResources;
-            if (!resourcesConnected) throw new Error(`No appropriate handler connected for ${filePath}`);
-            if (!props.connectDatabase && Array.from(resourcesConnected).includes(ConnectedResources.DATABASE.toString()))
-                throw new Error(`Trying to connect database to a lambda on a non-connected stack in ${filePath}`);
-
-            const camelCasePath = kebabToCamel(filePath.replace("/", "-"));
-
-            const logGroup = new LogGroup(this, `TSApiLambdaLog-${camelCasePath}${props.deployFor}`, {
-                removalPolicy: RemovalPolicy.DESTROY,
-                retention: RetentionDays.THREE_DAYS,
-                ...props.logGroupProps
-            });
-
-            let lambdaProperties = {
-                entry: `${filePath}.ts`,
-                handler: key as string,
-                description: `${props.description} - ${subPath}/${key as string} (${props.deployFor})`,
-                runtime: this.DEFAULT_RUNTIME,
-                memorySize: 256,
-                architecture: this.DEFAULT_ARCHITECTURE,
-                timeout: Duration.seconds(60),
-                logGroup,
-                layers: [sharedLayer, ...(props.extraLayers ?? [])],
-                bundling: {
-                    minify: true,
-                    sourceMap: true,
-                    ...(props.extraBundling ?? {})
-                },
-                ...props.lambdaProps
-            } as NodejsFunctionProps;
-            if (props.connectDatabase)
-                lambdaProperties = this.addDatabaseProperties(props, lambdaProperties, camelCasePath);
-
-            const lambda = new NodejsFunction(
-                this,
-                `TSApiLambda-${camelCasePath}`,
-                lambdaProperties
-            );
-
-            if (props.connectDatabase)
-                this.connectLambdaToDatabase(lambda, lambdaProperties.securityGroups![0], props, camelCasePath);
+            const lambda = this.createLambda(props, subPath, sharedLayer, key, filePath)
 
             const lambdaIntegration = new HttpLambdaIntegration(
                 `Integration-${props.lambdaPath}-${keyKebabCase}-${subPath.replace("/", "-")}-${props.deployFor}`,
@@ -189,26 +205,58 @@ export class TSApiConstruct<T extends ApiDefinition> extends Construct {
             corsPreflight: { allowMethods: [CorsHttpMethod.ANY], allowOrigins: ['*'], allowHeaders: ['*'] },
         });
 
-        if (props.connectDatabase) {
-            const vpc = this.vpc = new Vpc(this, `VPC-${props.apiName}-${props.deployFor}`, { natGateways: 1 });
-            this.databaseSG = new SecurityGroup(this, `SG-${props.apiName}-${props.deployFor}`, { vpc });
-            this.database = new DatabaseInstance(this, `DB-${props.apiName}-${props.deployFor}`, {
-                engine: DatabaseInstanceEngine.postgres({ version: PostgresEngineVersion.VER_16 }),
-                databaseName: props.databaseName,
-                instanceType: InstanceType.of(InstanceClass.T3, InstanceSize.MICRO),
-                vpc: this.vpc,
-                securityGroups: [this.databaseSG],
-                credentials: Credentials.fromGeneratedSecret("postgres"),
-                allocatedStorage: 10,
-                maxAllocatedStorage: 50
-            });
-        }
-
         const sharedLayer = new LayerVersion(this, `SharedLayer-${props.apiName}-${props.deployFor}`, {
             code: Code.fromAsset(props.sharedLayerPath ?? `${props.lambdaPath}/shared-layer`),
             compatibleArchitectures: [props.lambdaProps?.architecture ?? this.DEFAULT_ARCHITECTURE],
             compatibleRuntimes: [props.lambdaProps?.runtime ?? this.DEFAULT_RUNTIME]
         })
+
+        if (props.connectDatabase) {
+            const vpc = this.vpc = new Vpc(this, `VPC-${props.apiName}-${props.deployFor}`, { natGateways: 1 });
+            this.databaseSG = new SecurityGroup(this, `SG-${props.apiName}-${props.deployFor}`, { vpc });
+            this.database = new DatabaseInstance(this, `DB-${props.apiName}-${props.deployFor}`, {
+                engine: DatabaseInstanceEngine.postgres({ version: PostgresEngineVersion.VER_16 }),
+                instanceType: InstanceType.of(InstanceClass.T3, InstanceSize.MICRO),
+                vpc: this.vpc,
+                securityGroups: [this.databaseSG],
+                credentials: Credentials.fromGeneratedSecret("postgres"),
+                allocatedStorage: 10,
+                maxAllocatedStorage: 50,
+                ...props.dbProps
+            });
+
+            if (props.migrationLambda) {
+                const keyKebabCase = camelToKebab(props.migrationLambda)
+                const subPath = props.migrationLambdaPath ?? "";
+                const filePath = `${props.lambdaPath}${subPath}/${keyKebabCase}`
+                const handler = requireHereAndUp(filePath)[props.migrationLambda]
+                const resourcesConnected = handler?.connectedResources;
+                const checksum = readFileSync(`${filePath}.ts`)
+                    .reduce((accumulator, sym) => accumulator = (accumulator + BigInt(sym)) % (65536n ** 2n), 0n)
+
+                if (!handler?.isMigrationHandler || !resourcesConnected)
+                    throw new Error(`No appropriate migration handler connected for ${filePath}`);
+
+                const migrationLambda = this.createLambda(
+                    props,
+                    subPath,
+                    sharedLayer,
+                    props.migrationLambda,
+                    filePath
+                )
+                const customResourceProvider = new Provider(
+                    this, `MigrationResourceProvider-${props.apiName}-${props.deployFor}`, {
+                    onEventHandler: migrationLambda
+                })
+                const customResource = new CustomResource(
+                    this, `MigrationResource-${props.apiName}-${props.deployFor}`, {
+                    serviceToken: customResourceProvider.serviceToken,
+                    resourceType: "Custom::PostgresDatabaseMigration",
+                    properties: { Checksum: checksum.toString() }
+                })
+                customResource.node.addDependency(this.database)
+            }
+        }
 
         this.lambdas = this.createLambdasForApi(
             props, "",
