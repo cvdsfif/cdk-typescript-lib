@@ -10,7 +10,7 @@
   ],
   "scripts": {
     "build": "rm -rf dist && node build.js && tsc --emitDeclarationOnly",
-    "test": "tsc --build --clean && jest $npm_config_dir && $(yarn bin)/coverage-badges"
+    "test": "tsc --build --clean && jest --runInBand $npm_config_dir && $(yarn bin)/coverage-badges"
   },
   "repository": {
     "type": "git",
@@ -25,6 +25,7 @@
   "author": "Nikit Zykov <ch.destr@gmail.com>",
   "license": "ISC",
   "devDependencies": {
+    "@testcontainers/postgresql": "^10.6.0",
     "@types/jest": "^29.5.11",
     "@types/pg": "^8.11.0",
     "coverage-badges": "^1.0.7",
@@ -37,7 +38,7 @@
     "aws-cdk-lib": "^2.122.0",
     "constructs": "^10.3.0",
     "pg": "^8.11.3",
-    "typizator": "^1.0.0-beta.25",
-    "typizator-handler": "^1.0.0-beta.11"
+    "typizator": "^1.0.0-beta.28",
+    "typizator-handler": "^1.0.0-beta.17"
   }
 }

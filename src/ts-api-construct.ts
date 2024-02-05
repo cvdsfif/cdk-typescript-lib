@@ -114,7 +114,7 @@ export class TSApiConstruct<T extends ApiDefinition> extends Construct {
 
             const camelCasePath = kebabToCamel(filePath.replace("/", "-"));
 
-            const logGroup = new LogGroup(this, `TSApiLambdaLog-${camelCasePath}-${props.deployFor}`, {
+            const logGroup = new LogGroup(this, `TSApiLambdaLog-${camelCasePath}${props.deployFor}`, {
                 removalPolicy: RemovalPolicy.DESTROY,
                 retention: RetentionDays.THREE_DAYS,
                 ...props.logGroupProps
