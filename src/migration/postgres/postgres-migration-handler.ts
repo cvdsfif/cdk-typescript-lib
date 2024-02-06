@@ -1,5 +1,5 @@
 import { ConnectedResources, DatabaseConnection, connectDatabase, connectPostgresDb } from "typizator-handler"
-import { CdkCustomResourceResponse, CloudFormationCustomResourceEvent, CloudFormationCustomResourceResponse } from "../../lib/cloud-formation-types"
+import { CdkCustomResourceResponse, CloudFormationCustomResourceEvent } from "../../lib/cloud-formation-types"
 
 export type MigrationResultSuccess = {
     successful: true,

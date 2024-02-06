@@ -11,9 +11,28 @@ import { ApiDefinition, ApiMetadata } from "typizator";
 import { ConnectedResources, PING } from "typizator-handler";
 import { Provider } from "aws-cdk-lib/custom-resources";
 import { readFileSync } from "fs";
+import { CronOptions, Rule, RuleTargetInput, Schedule } from "aws-cdk-lib/aws-events";
+import { LambdaFunction } from "aws-cdk-lib/aws-events-targets";
 
 export interface ExtendedStackProps extends StackProps {
     deployFor: string
+}
+
+export type LambdaProperties = {
+    nodejsFunctionProps?: Partial<NodejsFunctionProps>,
+    logGroupProps?: LogGroupProps,
+    extraBundling?: Partial<BundlingOptions>,
+    extraLayers?: LayerVersion[],
+    schedules?: [{
+        cron: CronOptions,
+        eventBody?: string
+    }]
+}
+export type LambdaPropertiesTree<T extends ApiDefinition> = {
+    [K in keyof T]?:
+    T[K] extends ApiDefinition ?
+    LambdaPropertiesTree<T[K]> :
+    LambdaProperties
 }
 
 export type TSApiProperties<T extends ApiDefinition> = {
@@ -26,7 +45,8 @@ export type TSApiProperties<T extends ApiDefinition> = {
     logGroupProps?: LogGroupProps,
     sharedLayerPath?: string,
     extraLayers?: LayerVersion[],
-    extraBundling?: Partial<BundlingOptions>
+    extraBundling?: Partial<BundlingOptions>,
+    lambdaPropertiesTree?: LambdaPropertiesTree<T>
 }
 
 export type TSApiPlainProperties<T extends ApiDefinition> = TSApiProperties<T> & {
@@ -106,7 +126,8 @@ export class TSApiConstruct<T extends ApiDefinition> extends Construct {
         subPath: string,
         sharedLayer: LayerVersion,
         key: string,
-        filePath: string
+        filePath: string,
+        specificLambdaProperties?: LambdaProperties
     ) => {
         const handler = requireHereAndUp(`${filePath}`)[key];
         const resourcesConnected = handler?.connectedResources;
@@ -119,7 +140,8 @@ export class TSApiConstruct<T extends ApiDefinition> extends Construct {
         const logGroup = new LogGroup(this, `TSApiLambdaLog-${camelCasePath}${props.deployFor}`, {
             removalPolicy: RemovalPolicy.DESTROY,
             retention: RetentionDays.THREE_DAYS,
-            ...props.logGroupProps
+            ...props.logGroupProps,
+            ...specificLambdaProperties?.logGroupProps
         });
 
         let lambdaProperties = {
@@ -131,25 +153,38 @@ export class TSApiConstruct<T extends ApiDefinition> extends Construct {
             architecture: this.DEFAULT_ARCHITECTURE,
             timeout: Duration.seconds(60),
             logGroup,
-            layers: [sharedLayer, ...(props.extraLayers ?? [])],
+            layers: [sharedLayer, ...(specificLambdaProperties?.extraLayers ?? props.extraLayers ?? [])],
             bundling: {
                 minify: true,
                 sourceMap: true,
-                ...(props.extraBundling ?? {})
+                ...(props.extraBundling ?? {}),
+                ...specificLambdaProperties?.extraBundling
             },
-            ...props.lambdaProps
+            ...props.lambdaProps,
+            ...specificLambdaProperties?.nodejsFunctionProps
         } as NodejsFunctionProps;
         if (props.connectDatabase)
             lambdaProperties = this.addDatabaseProperties(props, lambdaProperties, camelCasePath);
 
         const lambda = new NodejsFunction(
             this,
-            `TSApiLambda-${camelCasePath}`,
+            `TSApiLambda-${camelCasePath}${props.deployFor}`,
             lambdaProperties
         );
 
         if (props.connectDatabase)
             this.connectLambdaToDatabase(lambda, lambdaProperties.securityGroups![0], props, camelCasePath);
+
+        if (specificLambdaProperties?.schedules) {
+            specificLambdaProperties.schedules.forEach((schedule, idx) => {
+                const eventRule = new Rule(this, `TSApiLambdaSchedule${idx}-${camelCasePath}${props.deployFor}`, {
+                    schedule: Schedule.cron(schedule.cron)
+                })
+                eventRule.addTarget(new LambdaFunction(lambda, {
+                    event: RuleTargetInput.fromObject({ body: schedule.eventBody ?? "{}" })
+                }))
+            })
+        }
 
         return lambda
     }
@@ -161,10 +196,17 @@ export class TSApiConstruct<T extends ApiDefinition> extends Construct {
             httpApi: HttpApi,
             sharedLayer: LayerVersion,
             key: string,
-            keyKebabCase: string
+            keyKebabCase: string,
+            specificLambdaProperties: LambdaProperties
         ) => {
             const filePath = `${props.lambdaPath}${subPath}/${keyKebabCase}`;
-            const lambda = this.createLambda(props, subPath, sharedLayer, key, filePath)
+            const lambda = this.createLambda(
+                props,
+                subPath,
+                sharedLayer,
+                key,
+                filePath,
+                specificLambdaProperties)
 
             const lambdaIntegration = new HttpLambdaIntegration(
                 `Integration-${props.lambdaPath}-${keyKebabCase}-${subPath.replace("/", "-")}-${props.deployFor}`,
@@ -185,17 +227,59 @@ export class TSApiConstruct<T extends ApiDefinition> extends Construct {
             subPath: string,
             apiMetadata: ApiMetadata<R>,
             httpApi: HttpApi,
-            sharedLayer: LayerVersion
+            sharedLayer: LayerVersion,
+            lambdaPropertiesTree?: LambdaPropertiesTree<R>
         ) => {
             const lambdas = {} as ApiLambdas<R>;
             for (const [key, data] of apiMetadata.members) {
                 const keyKebabCase = camelToKebab(key as string);
                 if (data.dataType === "api")
-                    (lambdas as any)[key] = this.createLambdasForApi(props, `${subPath}/${keyKebabCase}`, data, httpApi, sharedLayer);
+                    (lambdas as any)[key] = this.createLambdasForApi(
+                        props,
+                        `${subPath}/${keyKebabCase}`,
+                        data,
+                        httpApi,
+                        sharedLayer,
+                        (lambdaPropertiesTree as any)?.[key]
+                    );
                 else
-                    (lambdas as any)[key] = this.connectLambda(props, subPath, httpApi, sharedLayer, key as string, keyKebabCase);
+                    (lambdas as any)[key] = this.connectLambda(
+                        props,
+                        subPath,
+                        httpApi,
+                        sharedLayer,
+                        key as string,
+                        keyKebabCase,
+                        (lambdaPropertiesTree as any)?.[key]
+                    );
             }
             return lambdas;
+        }
+
+    private listLambdaArchitectures =
+        <T extends ApiDefinition>(initialSet: Set<Architecture>, lambdaPropertiesTree?: LambdaPropertiesTree<T>, depth = 0) => {
+            if (!lambdaPropertiesTree || depth++ > 8) return;
+            Object.keys(lambdaPropertiesTree)
+                .forEach(key => {
+                    if ((lambdaPropertiesTree as any)[key]) {
+                        if ((lambdaPropertiesTree as any)[key]?.nodejsFunctionProps?.architecture)
+                            initialSet.add((lambdaPropertiesTree as any)[key]?.nodejsFunctionProps?.architecture)
+                        else this.listLambdaArchitectures(initialSet, (lambdaPropertiesTree as any)[key], depth)
+                    }
+                })
+        }
+
+    private listLambdaRuntimes =
+        <T extends ApiDefinition>(initialSet: Set<Runtime>, lambdaPropertiesTree?: LambdaPropertiesTree<T>, depth = 0) => {
+            if (!lambdaPropertiesTree || depth++ > 8) return;
+            Object.keys(lambdaPropertiesTree)
+                .forEach(key => {
+                    if ((lambdaPropertiesTree as any)[key]) {
+                        if ((lambdaPropertiesTree as any)[key]?.nodejsFunctionProps?.runtime)
+                            initialSet.add((lambdaPropertiesTree as any)[key]?.nodejsFunctionProps?.runtime)
+                        else this.listLambdaRuntimes(initialSet, (lambdaPropertiesTree as any)[key], depth)
+                    }
+                })
         }
 
     constructor(scope: Construct, id: string, props: TSApiPlainProperties<T> | TSApiDatabaseProperties<T>) {
@@ -205,10 +289,16 @@ export class TSApiConstruct<T extends ApiDefinition> extends Construct {
             corsPreflight: { allowMethods: [CorsHttpMethod.ANY], allowOrigins: ['*'], allowHeaders: ['*'] },
         });
 
+        const architecturesSet = new Set<Architecture>([this.DEFAULT_ARCHITECTURE]);
+        if (props.lambdaProps?.architecture) architecturesSet.add(props.lambdaProps?.architecture);
+        this.listLambdaArchitectures(architecturesSet, props.lambdaPropertiesTree);
+        const runtimesSet = new Set<Runtime>([this.DEFAULT_RUNTIME]);
+        if (props.lambdaProps?.runtime) runtimesSet.add(props.lambdaProps?.runtime);
+        this.listLambdaRuntimes(runtimesSet, props.lambdaPropertiesTree);
         const sharedLayer = new LayerVersion(this, `SharedLayer-${props.apiName}-${props.deployFor}`, {
             code: Code.fromAsset(props.sharedLayerPath ?? `${props.lambdaPath}/shared-layer`),
-            compatibleArchitectures: [props.lambdaProps?.architecture ?? this.DEFAULT_ARCHITECTURE],
-            compatibleRuntimes: [props.lambdaProps?.runtime ?? this.DEFAULT_RUNTIME]
+            compatibleArchitectures: [...architecturesSet],
+            compatibleRuntimes: [...runtimesSet]
         })
 
         if (props.connectDatabase) {
@@ -262,6 +352,7 @@ export class TSApiConstruct<T extends ApiDefinition> extends Construct {
             props, "",
             props.apiMetadata,
             this.httpApi,
-            sharedLayer);
+            sharedLayer,
+            props.lambdaPropertiesTree);
     }
 }

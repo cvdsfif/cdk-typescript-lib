@@ -102,7 +102,6 @@ describe("Test the migration handlers using migration lists", () => {
             RequestType: "Create",
             ...dumbEvent
         })
-        console.log(result)
         expect(result.Status).toEqual("SUCCESS")
         expect(queryFn).toHaveBeenCalledWith(expect.objectContaining({ values: expect.arrayContaining(["SELECT 1"]) }))
     })

@@ -1,11 +1,10 @@
-import { App, Stack } from "aws-cdk-lib";
+import { App, RemovalPolicy, Stack } from "aws-cdk-lib";
 import { Match, Template } from "aws-cdk-lib/assertions";
 import { Construct } from "constructs";
 import { simpleApiS } from "./lambda/shared/simple-api-definition";
 import { ApiDefinition } from "typizator";
 import { ExtendedStackProps, TSApiConstruct, TSApiPlainProperties } from "../src/ts-api-construct";
-import { Runtime } from "aws-cdk-lib/aws-lambda";
-import { RetentionDays } from "aws-cdk-lib/aws-logs";
+import { Architecture, Runtime } from "aws-cdk-lib/aws-lambda";
 
 describe("Testing the behaviour of the Typescript API construct for CDK", () => {
     class TestStack<T extends ApiDefinition> extends Stack {
@@ -33,7 +32,30 @@ describe("Testing the behaviour of the Typescript API construct for CDK", () => 
                 description: "Test Typescript API",
                 apiMetadata: simpleApiS.metadata,
                 lambdaPath: "tests/lambda",
-                connectDatabase: false
+                connectDatabase: false,
+                lambdaPropertiesTree: {
+                    meow: {
+                        schedules: [{
+                            cron: { minute: "0/1" }
+                        }]
+                    },
+                    noMeow: {
+                        nodejsFunctionProps: {
+                            runtime: Runtime.NODEJS_18_X
+                        },
+                        logGroupProps: {
+                            removalPolicy: RemovalPolicy.SNAPSHOT
+                        }
+                    },
+                    cruel: {
+                        world: {
+                            nodejsFunctionProps: {
+                                runtime: Runtime.NODEJS_16_X,
+                                architecture: Architecture.X86_64
+                            }
+                        }
+                    }
+                }
             }
         );
         template = Template.fromStack(stack);
@@ -116,11 +138,12 @@ describe("Testing the behaviour of the Typescript API construct for CDK", () => 
                 }
             })
         );
-        template.hasResourceProperties("AWS::Logs::LogGroup",
-            Match.objectLike({
-                "RetentionInDays": 3
-            })
-        );
+
+        let allLogGroups = template.findResources("AWS::Logs::LogGroup", Match.anyValue())
+        let helloWorldLogGroupKey = Object.keys(allLogGroups).find(key => key.includes("HelloWorld"));
+        expect(allLogGroups[helloWorldLogGroupKey!].DeletionPolicy).toEqual("Delete")
+        const noMeowLogGroupKey = Object.keys(allLogGroups).find(key => key.includes("NoMeow"));
+        expect(allLogGroups[noMeowLogGroupKey!].DeletionPolicy).toEqual("Snapshot")
 
         // Create a separate stack with updated Lambda config
         const app = new App();
@@ -134,10 +157,11 @@ describe("Testing the behaviour of the Typescript API construct for CDK", () => 
                 apiMetadata: simpleApiS.metadata,
                 lambdaPath: "tests/lambda",
                 lambdaProps: {
-                    runtime: Runtime.NODEJS_18_X
+                    runtime: Runtime.NODEJS_18_X,
+                    architecture: Architecture.ARM_64
                 },
                 logGroupProps: {
-                    retention: RetentionDays.FIVE_DAYS
+                    removalPolicy: RemovalPolicy.RETAIN
                 },
                 connectDatabase: false
             }
@@ -152,11 +176,9 @@ describe("Testing the behaviour of the Typescript API construct for CDK", () => 
                 }
             })
         );
-        template.hasResourceProperties("AWS::Logs::LogGroup",
-            Match.objectLike({
-                "RetentionInDays": 5
-            })
-        );
+        allLogGroups = template.findResources("AWS::Logs::LogGroup", Match.anyValue())
+        helloWorldLogGroupKey = Object.keys(allLogGroups).find(key => key.includes("HelloWorld"));
+        expect(allLogGroups[helloWorldLogGroupKey!].DeletionPolicy).toEqual("Retain")
     });
 
     test("Should add a shared layer to lambdas", () => {
@@ -174,8 +196,24 @@ describe("Testing the behaviour of the Typescript API construct for CDK", () => 
         );
         template.hasResourceProperties("AWS::Lambda::LayerVersion",
             Match.objectLike({
-                "CompatibleRuntimes": ["nodejs20.x"]
+                "CompatibleRuntimes": Match.arrayWith(["nodejs20.x", "nodejs18.x", "nodejs16.x"])
             })
         );
     });
+
+    test("Should set the timers as required", () => {
+        template.hasResourceProperties("AWS::Events::Rule",
+            Match.objectLike({
+                "ScheduleExpression": "cron(0/1 * * * ? *)"
+            })
+        )
+        template.hasResourceProperties("AWS::Events::Rule",
+            Match.objectLike({
+                "Targets": [Match.objectLike({
+                    "Arn": { "Fn::GetAtt": [Match.stringLikeRegexp("Meow"), "Arn"] },
+                    "Input": "{\"body\":\"{}\"}"
+                })]
+            })
+        )
+    })
 });
