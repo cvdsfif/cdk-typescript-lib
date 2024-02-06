@@ -107,5 +107,4 @@ export class PostgresListMigrationProcessor implements MigrationProcessor {
             lastSuccessful
         }) as MigrationResultSuccess
     }
-
 }

@@ -2,7 +2,7 @@ import { App, Stack } from "aws-cdk-lib";
 import { Construct } from "constructs";
 import { ApiDefinition } from "typizator";
 import { ExtendedStackProps, TSApiConstruct, TSApiDatabaseProperties, TSApiPlainProperties } from "../src/ts-api-construct";
-import { Match, Template } from "aws-cdk-lib/assertions";
+import { Match, Matcher, Template } from "aws-cdk-lib/assertions";
 import { connectedApi } from "./lambda/shared/connected-api-definition";
 import { extendExpectWithToContainStrings } from "./util/expect-contain-strings";
 
@@ -189,5 +189,35 @@ describe("Testing a stack with connected database", () => {
                 }
             )
         ).rejects.toContainAllStrings("No appropriate migration handler")
+    })
+
+    test("Should create a stack with Bastion access", () => {
+        const app = new App();
+
+        const stack = new TestStack(
+            app, "TestedStack", props,
+            {
+                ...props,
+                apiName: "TSTestApi",
+                description: "Test Typescript API",
+                apiMetadata: connectedApi.metadata,
+                lambdaPath: "tests/lambda",
+                connectDatabase: true,
+                dbProps: {
+                    databaseName: "TestDatabase"
+                },
+                bastion: {
+                    openTo: ["8.8.8.8/32"]
+                }
+            }
+        );
+        const template = Template.fromStack(stack)
+
+        template.hasResourceProperties("AWS::EC2::Instance",
+            Match.objectLike({
+                "IamInstanceProfile": { "Ref": Match.stringLikeRegexp("SimpleApiBastionHost") },
+                "InstanceType": "t3.nano"
+            })
+        )
     })
 });

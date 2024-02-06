@@ -1,7 +1,7 @@
 import { CustomResource, Duration, RemovalPolicy, StackProps } from "aws-cdk-lib";
 import { CorsHttpMethod, HttpApi, HttpMethod } from "aws-cdk-lib/aws-apigatewayv2";
 import { HttpLambdaIntegration } from "aws-cdk-lib/aws-apigatewayv2-integrations";
-import { ISecurityGroup, InstanceClass, InstanceSize, InstanceType, Port, SecurityGroup, Vpc } from "aws-cdk-lib/aws-ec2";
+import { BastionHostLinux, ISecurityGroup, InstanceClass, InstanceSize, InstanceType, Peer, Port, SecurityGroup, SubnetType, Vpc } from "aws-cdk-lib/aws-ec2";
 import { Architecture, Code, LayerVersion, Runtime } from "aws-cdk-lib/aws-lambda";
 import { BundlingOptions, NodejsFunction, NodejsFunctionProps } from "aws-cdk-lib/aws-lambda-nodejs";
 import { LogGroup, LogGroupProps, RetentionDays } from "aws-cdk-lib/aws-logs";
@@ -57,7 +57,10 @@ export type TSApiDatabaseProperties<T extends ApiDefinition> = TSApiProperties<T
     connectDatabase: true,
     migrationLambda?: string,
     migrationLambdaPath?: string,
-    dbProps: Partial<Omit<DatabaseInstanceProps, "databaseName">> & { databaseName: string }
+    dbProps: Partial<Omit<DatabaseInstanceProps, "databaseName">> & { databaseName: string },
+    bastion?: {
+        openTo: string[] & { 0: string }
+    }
 }
 
 const camelToKebab = (src: string | String) => src.replace(/[A-Z]/g, match => `-${match.toLowerCase()}`);
@@ -116,7 +119,7 @@ export class TSApiConstruct<T extends ApiDefinition> extends Construct {
             this.database!.secret?.grantRead(lambda);
             this.databaseSG!.addIngressRule(
                 lambdaSG,
-                Port.tcp(5432),
+                Port.tcp(this.database!.instanceEndpoint.port),
                 `Lamda2PG-${camelCasePath}-${props.deployFor}`
             )
         }
@@ -345,6 +348,22 @@ export class TSApiConstruct<T extends ApiDefinition> extends Construct {
                     properties: { Checksum: checksum.toString() }
                 })
                 customResource.node.addDependency(this.database)
+            }
+
+            if (props.bastion) {
+                const bastion = new BastionHostLinux(
+                    this,
+                    `BastionHost-${props.apiName}-${props.deployFor}`, {
+                    vpc: this.vpc,
+                    instanceType: new InstanceType("t3.nano"),
+                    subnetSelection: { subnetType: SubnetType.PUBLIC }
+                })
+                props.bastion.openTo.forEach(address => bastion.allowSshAccessFrom(Peer.ipv4(address)))
+                this.database.connections.allowFrom(
+                    bastion.connections,
+                    Port.tcp(this.database.instanceEndpoint.port),
+                    `${props.apiName} API Bastion connection for the RDP database`
+                )
             }
         }
 
