@@ -13,12 +13,12 @@ describe("Testing the migration tool for Postgres using a forward-only migration
     let connection: DatabaseConnection
     let underTest: MigrationProcessor
     const basicMigrationList = migrationList()
-        .migrate({
+        .migration({
             order: 1,
             description: "M1",
             query: "CREATE TABLE test_table(id INTEGER,name TEXT)"
         })
-        .migrate({
+        .migration({
             order: 2,
             description: "M2",
             query: "INSERT INTO test_table VALUES(1,'one')"
@@ -57,7 +57,7 @@ describe("Testing the migration tool for Postgres using a forward-only migration
     test("Should report an error on database exception", async () => {
         const localMigration = new PostgresListMigrationProcessor(
             migrationList()
-                .migrate({
+                .migration({
                     order: 1,
                     description: "M1",
                     query: "You cannot execute this"
@@ -83,7 +83,7 @@ describe("Testing the migration tool for Postgres using a forward-only migration
 
         const localMigration = new PostgresListMigrationProcessor(
             basicMigrationList
-                .migrate({
+                .migration({
                     order: 3,
                     description: "M3",
                     query: "UPDATE test_table SET name='two'"
@@ -97,7 +97,7 @@ describe("Testing the migration tool for Postgres using a forward-only migration
     test("Should recover after failed migration", async () => {
         let localMigration = new PostgresListMigrationProcessor(
             migrationList()
-                .migrate({
+                .migration({
                     order: 1,
                     description: "M1",
                     query: "You cannot execute this"
@@ -118,17 +118,17 @@ describe("Testing the migration tool for Postgres using a forward-only migration
 
         const localMigration = new PostgresListMigrationProcessor(
             migrationList()
-                .migrate({
+                .migration({
                     order: 1,
                     description: "M1",
                     query: "CREATE TABLE test_table(id INTEGER,name TEXT)"
                 })
-                .migrate({
+                .migration({
                     order: 2,
                     description: "M2",
                     query: "We try to change it"
                 })
-                .migrate({
+                .migration({
                     order: 3,
                     description: "M3",
                     query: "UPDATE test_table SET name='two'"
@@ -144,13 +144,13 @@ describe("Testing the migration tool for Postgres using a forward-only migration
 
         const localMigration = new PostgresListMigrationProcessor(
             migrationList()
-                .migrate({
+                .migration({
                     order: 1,
                     description: "M1",
                     query: "CREATE TABLE test_table(id INTEGER,name TEXT)"
                 })
                 // We try to remove a migration that is already in the database
-                .migrate({
+                .migration({
                     order: 3,
                     description: "M3",
                     query: "UPDATE test_table SET name='two'"

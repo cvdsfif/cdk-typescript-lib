@@ -7,17 +7,17 @@ describe("Testing the events lists for migrations", () => {
 
     test("List with three elements is correctly creates", () => {
         const threeMigrationsList = migrationList()
-            .migrate({
+            .migration({
                 order: 1,
                 description: "D1",
                 query: "Q1"
             })
-            .migrate({
+            .migration({
                 order: 2,
                 description: "D2",
                 query: "Q2"
             })
-            .migrate({
+            .migration({
                 order: 3,
                 description: "D3",
                 query: "Q3"
@@ -29,16 +29,16 @@ describe("Testing the events lists for migrations", () => {
     })
 
     test("Zero or negative migration order numbers should be forbidden", () => {
-        expect(() => migrationList().migrate({ order: 0, description: "D", query: "1" }))
+        expect(() => migrationList().migration({ order: 0, description: "D", query: "1" }))
             .toThrow("Migration order number must be greater than zero");
-        expect(() => migrationList().migrate({ order: -100, description: "D", query: "1" }))
+        expect(() => migrationList().migration({ order: -100, description: "D", query: "1" }))
             .toThrow("Migration order number must be greater than zero");
     })
 
     test("Migration numbers should never decrease", () => {
         expect(() => migrationList()
-            .migrate({ order: 10, description: "D", query: "1" })
-            .migrate({ order: 9, description: "D", query: "1" })
+            .migration({ order: 10, description: "D", query: "1" })
+            .migration({ order: 9, description: "D", query: "1" })
         ).toThrow("Migration orders must grow, migration 9 cannot go after migration 10")
     })
 })

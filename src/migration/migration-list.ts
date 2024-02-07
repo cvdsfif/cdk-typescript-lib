@@ -5,11 +5,11 @@ export type Migration = {
 }
 
 export type MigrationList = Migration[] & {
-    migrate: (migration: Migration) => MigrationList
+    migration: (migration: Migration) => MigrationList
 }
 
 const internalMigrationList = (migrations: Migration[]) => {
-    (migrations as any).migrate = (migration: Migration) => {
+    (migrations as any).migration = (migration: Migration) => {
         if (migration.order <= 0) throw new Error("Migration order number must be greater than zero");
         if (migrations.length > 0 && migration.order <= migrations[migrations.length - 1].order)
             throw new Error(`Migration orders must grow, migration ${migration

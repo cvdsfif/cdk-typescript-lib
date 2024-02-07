@@ -67,7 +67,7 @@ describe("Test the migration handlers using migration lists", () => {
     test("Should correctly connect the migration handler from the migration list definition", async () => {
         const underTest = postgresListMigrationHandler(
             migrationList()
-                .migrate({
+                .migration({
                     order: 1,
                     query: "SELECT 1",
                     description: "M1"
@@ -91,7 +91,7 @@ describe("Test the migration handlers using migration lists", () => {
     test("Should correctly accept a different migration table name", async () => {
         const underTest = postgresListMigrationHandler(
             migrationList()
-                .migrate({
+                .migration({
                     order: 1,
                     query: "SELECT 1",
                     description: "M1"
