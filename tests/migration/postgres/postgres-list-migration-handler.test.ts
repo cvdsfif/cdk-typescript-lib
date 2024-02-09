@@ -96,7 +96,7 @@ describe("Test the migration handlers using migration lists", () => {
                     query: "SELECT 1",
                     description: "M1"
                 }),
-            "another_table"
+            { migrationTableName: "another_table" }
         )
         const result = await underTest({
             RequestType: "Create",
