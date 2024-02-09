@@ -13,13 +13,25 @@ export const databaseMigrationSchema = objectS({
     message: stringS.notNull
 });
 
+export type MigrationProps = {
+    migrationTableName?: string,
+    allowMigrationContentsChanges?: boolean
+}
+
 export class PostgresListMigrationProcessor implements MigrationProcessor {
     static DEFAULT_MIGRATION_TABLE_NAME = "migration_log";
+    private _migrationTableName;
+    private allowMigrationContentsChange;
 
     constructor(
         private migrationList: MigrationList,
-        private _migrationTableName = PostgresListMigrationProcessor.DEFAULT_MIGRATION_TABLE_NAME
-    ) { }
+        props?: MigrationProps
+    ) {
+        this._migrationTableName =
+            props?.migrationTableName ??
+            PostgresListMigrationProcessor.DEFAULT_MIGRATION_TABLE_NAME
+        this.allowMigrationContentsChange = props?.allowMigrationContentsChanges ?? false
+    }
 
     get migrationTableName() { return this._migrationTableName };
 
@@ -45,11 +57,13 @@ export class PostgresListMigrationProcessor implements MigrationProcessor {
                     `The migration list must be immutable. The successful migration number ${migration.creationOrder
                     } not found in your list. The original query was "${migration.queryExecuted
                     }, executed on ${migration.runTs}"`);
-            if (existingMigration.query !== migration.queryExecuted)
-                throw new Error(
-                    `The migration list must be immutable. The successful migration number ${migration.creationOrder
+            if (existingMigration.query !== migration.queryExecuted) {
+                const errorMessage = `The migration list must be immutable. The successful migration number ${migration.creationOrder
                     } the query text modified. The original query was "${migration.queryExecuted
-                    }, executed on ${migration.runTs}"`);
+                    }, executed on ${migration.runTs}"`
+                if (!this.allowMigrationContentsChange) throw new Error(errorMessage);
+                console.warn(errorMessage);
+            }
 
             lastSuccessful = migration.creationOrder;
         });

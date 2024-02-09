@@ -39,8 +39,6 @@ describe("Testing the migration tool for Postgres using a forward-only migration
         await connection.query(`DROP TABLE IF EXISTS test_table`)
     })
 
-
-
     test("Should create the migration table", async () => {
         await underTest.initialize(connection)
         expect(await connection.select(databaseMigrationSchema, underTest.migrationTableName))
@@ -49,6 +47,14 @@ describe("Testing the migration tool for Postgres using a forward-only migration
 
     test("Should do a simple forward-only migration", async () => {
         await underTest.initialize(connection)
+        await underTest.migrate(connection)
+        expect((await connection.select(databaseMigrationSchema, underTest.migrationTableName)).length)
+            .toEqual(2)
+    })
+
+    test("Same migration should be able to run twice with no harm", async () => {
+        await underTest.initialize(connection)
+        await underTest.migrate(connection)
         await underTest.migrate(connection)
         expect((await connection.select(databaseMigrationSchema, underTest.migrationTableName)).length)
             .toEqual(2)
@@ -136,6 +142,33 @@ describe("Testing the migration tool for Postgres using a forward-only migration
         )
         expect(async () => await localMigration.migrate(connection)).rejects
             .toContainAllStrings("query text modified")
+    })
+
+    test("Should not break on changed migration if requested", async () => {
+        await underTest.initialize(connection)
+        await underTest.migrate(connection)
+
+        const localMigration = new PostgresListMigrationProcessor(
+            migrationList()
+                .migration({
+                    order: 1,
+                    description: "M1",
+                    query: "CREATE TABLE test_table(id INTEGER,name TEXT)"
+                })
+                .migration({
+                    order: 2,
+                    description: "M2",
+                    query: "We try to change it"
+                })
+                .migration({
+                    order: 3,
+                    description: "M3",
+                    query: "UPDATE test_table SET name='two'"
+                }), { allowMigrationContentsChanges: true }
+        )
+        await localMigration.migrate(connection)
+        expect((await connection.select(databaseMigrationSchema, underTest.migrationTableName)).length)
+            .toEqual(3)
     })
 
     test("Should report removed migration", async () => {

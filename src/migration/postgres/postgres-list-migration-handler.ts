@@ -6,4 +6,4 @@ import { PostgresListMigrationProcessor } from "./postgres-list-migration-proces
 export const postgresListMigrationHandler =
     (migrationList: MigrationList, migrationTableName = PostgresListMigrationProcessor.DEFAULT_MIGRATION_TABLE_NAME):
         (event: CloudFormationCustomResourceEvent) => Promise<CdkCustomResourceResponse> =>
-        postgresMigrationHandler(new PostgresListMigrationProcessor(migrationList, migrationTableName))
+        postgresMigrationHandler(new PostgresListMigrationProcessor(migrationList, { migrationTableName }))
