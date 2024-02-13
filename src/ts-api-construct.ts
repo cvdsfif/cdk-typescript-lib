@@ -92,16 +92,20 @@ export class TSApiConstruct<T extends ApiDefinition> extends Construct {
     private addDatabaseProperties =
         <R extends ApiDefinition>(
             props: TSApiDatabaseProperties<R>,
+            camelCasePath: string,
             lambdaProps: NodejsFunctionProps,
-            camelCasePath: string
+            specificLambdaProperties?: NodejsFunctionProps
         ) => {
             const lambdaSG = new SecurityGroup(this, `TSApiLambdaSG-${camelCasePath}-${props.deployFor}`, { vpc: this.vpc! });
             return {
                 ...lambdaProps,
+                ...specificLambdaProperties,
                 vpc: this.vpc,
                 securityGroups: [lambdaSG],
 
                 environment: {
+                    ...lambdaProps.environment,
+                    ...specificLambdaProperties?.environment,
                     DB_ENDPOINT_ADDRESS: this.database!.dbInstanceEndpointAddress,
                     DB_NAME: props.dbProps.databaseName,
                     DB_SECRET_ARN: this.database!.secret?.secretFullArn
@@ -164,10 +168,19 @@ export class TSApiConstruct<T extends ApiDefinition> extends Construct {
                 ...specificLambdaProperties?.extraBundling
             },
             ...props.lambdaProps,
-            ...specificLambdaProperties?.nodejsFunctionProps
+            ...specificLambdaProperties?.nodejsFunctionProps,
+            environment: {
+                ...props.lambdaProps?.environment,
+                ...specificLambdaProperties?.nodejsFunctionProps?.environment
+            }
         } as NodejsFunctionProps;
         if (props.connectDatabase)
-            lambdaProperties = this.addDatabaseProperties(props, lambdaProperties, camelCasePath);
+            lambdaProperties = this.addDatabaseProperties(
+                props,
+                camelCasePath,
+                lambdaProperties,
+                specificLambdaProperties?.nodejsFunctionProps
+            );
 
         const lambda = new NodejsFunction(
             this,

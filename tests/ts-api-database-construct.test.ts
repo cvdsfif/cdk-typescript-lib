@@ -35,6 +35,20 @@ describe("Testing a stack with connected database", () => {
                 apiMetadata: connectedApi.metadata,
                 lambdaPath: "tests/lambda",
                 connectDatabase: true,
+                lambdaProps: {
+                    environment: {
+                        ENV1: "a"
+                    }
+                },
+                lambdaPropertiesTree: {
+                    connectedFunction: {
+                        nodejsFunctionProps: {
+                            environment: {
+                                ENV2: "b"
+                            }
+                        }
+                    }
+                },
                 dbProps: {
                     databaseName: "TestDatabase",
                     maxAllocatedStorage: 120
@@ -51,6 +65,19 @@ describe("Testing a stack with connected database", () => {
                 "VPCSecurityGroups": [{ "Fn::GetAtt": [Match.stringLikeRegexp("SimpleApiSGTSTestApi"), "GroupId"] }]
             })
         )
+
+        template.hasResourceProperties("AWS::Lambda::Function",
+            Match.objectLike({
+                "Description": Match.stringLikeRegexp("connected"),
+                "Environment": {
+                    "Variables": Match.objectLike({
+                        "ENV1": "a",
+                        "ENV2": "b",
+                        "DB_NAME": "TestDatabase"
+                    })
+                }
+            })
+        );
     })
 
     test("Should connect the migration custom resource", () => {

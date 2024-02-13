@@ -33,11 +33,21 @@ describe("Testing the behaviour of the Typescript API construct for CDK", () => 
                 apiMetadata: simpleApiS.metadata,
                 lambdaPath: "tests/lambda",
                 connectDatabase: false,
+                lambdaProps: {
+                    environment: {
+                        ENV1: "a"
+                    }
+                },
                 lambdaPropertiesTree: {
                     meow: {
                         schedules: [{
                             cron: { minute: "0/1" }
-                        }]
+                        }],
+                        nodejsFunctionProps: {
+                            environment: {
+                                ENV2: "b"
+                            }
+                        }
                     },
                     noMeow: {
                         nodejsFunctionProps: {
@@ -64,7 +74,13 @@ describe("Testing the behaviour of the Typescript API construct for CDK", () => 
     test("Should create lambdas matching the API structure", () => {
         template.hasResourceProperties("AWS::Lambda::Function",
             Match.objectLike({
-                "Description": "Test Typescript API - /meow (test)"
+                "Description": "Test Typescript API - /meow (test)",
+                "Environment": {
+                    "Variables": Match.objectLike({
+                        "ENV1": "a",
+                        "ENV2": "b"
+                    })
+                }
             })
         );
         template.hasResourceProperties("AWS::Lambda::Function",
