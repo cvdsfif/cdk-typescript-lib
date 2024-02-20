@@ -80,8 +80,8 @@ describe("Test the migration handlers functionality", () => {
         expect(result.Status).toEqual("SUCCESS")
         expect(result.Data!.Result).toEqual("Last migration: 1")
         expect(result.PhysicalResourceId).toEqual("custom-RID")
-        expect(queryFn).toHaveBeenCalledWith("Initialize")
-        expect(queryFn).toHaveBeenCalledWith("Migrate")
+        expect(queryFn).toHaveBeenCalledWith({ text: "Initialize", values: [] })
+        expect(queryFn).toHaveBeenCalledWith({ text: "Migrate", values: [] })
         expect(endFn).toHaveBeenCalled()
     })
 
@@ -99,8 +99,8 @@ describe("Test the migration handlers functionality", () => {
         expect(result.Status).toEqual("SUCCESS")
         expect(result.Data!.Result).toEqual("Last migration: 1")
         expect(result.PhysicalResourceId).toEqual("PhID")
-        expect(queryFn).not.toHaveBeenCalledWith("Initialize")
-        expect(queryFn).toHaveBeenCalledWith("Migrate")
+        expect(queryFn).not.toHaveBeenCalledWith({ text: "Initialize", values: [] })
+        expect(queryFn).toHaveBeenCalledWith({ text: "Migrate", values: [] })
     })
 
     test("Should handle deletion event", async () => {
@@ -116,8 +116,8 @@ describe("Test the migration handlers functionality", () => {
         expect(result.Status).toEqual("SUCCESS")
         expect(result.Data!.Result).toEqual("This is forward-only migration, delete event ignored")
         expect(result.PhysicalResourceId).toEqual("PhID")
-        expect(queryFn).not.toHaveBeenCalledWith("Initialize")
-        expect(queryFn).not.toHaveBeenCalledWith("Migrate")
+        expect(queryFn).not.toHaveBeenCalledWith({ text: "Initialize", values: [] })
+        expect(queryFn).not.toHaveBeenCalledWith({ text: "Migrate", values: [] })
         expect(endFn).not.toHaveBeenCalled()
     })
 
