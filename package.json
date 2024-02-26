@@ -1,6 +1,6 @@
 {
   "name": "cdk-typescript-lib",
-  "version": "1.0.0-beta.22",
+  "version": "1.0.0-beta.23",
   "description": "Implementing generic typescript API interfaces on CDK",
   "main": "dist/index.cjs.js",
   "module": "dist/index.esm.js",
@@ -36,10 +36,10 @@
     "typescript": "^5.3.3"
   },
   "dependencies": {
-    "aws-cdk-lib": "^2.122.0",
+    "aws-cdk-lib": "^2.130.0",
     "constructs": "^10.3.0",
     "pg": "^8.11.3",
-    "typizator": "^1.0.0-beta.36",
-    "typizator-handler": "^1.0.0-beta.26"
+    "typizator": "^1.0.0-beta.37",
+    "typizator-handler": "^1.0.0-beta.27"
   }
 }
