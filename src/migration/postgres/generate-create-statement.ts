@@ -21,8 +21,8 @@ const generateFieldsList = <T extends SchemaDefinition>(
     schema: ObjectS<T>,
     primaryKeys: (keyof T)[],
     metadata: DbMetadata<T>) =>
-    Array.from(schema.metadata.fields)
-        .map(([key, data]) => `${camelToSnake(key)} ${postgresTypeFor(key, data, primaryKeys, metadata)}`)
+    schema.metadata.fields
+        .map((key, data) => `${camelToSnake(key)} ${postgresTypeFor(key, data, primaryKeys, metadata)}`)
         .join(",\n")
 
 const postgresTypeFor = <T extends SchemaDefinition>(
