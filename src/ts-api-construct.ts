@@ -87,7 +87,7 @@ const DEFAULT_RUNTIME = Runtime.NODEJS_20_X;
 
 const createHttpApi = <T extends ApiDefinition>(
     scope: Construct,
-    props: TSApiPlainProperties<T> | TSApiDatabaseProperties<T> | DependentApiProperties<T>,
+    props: TSApiPlainProperties<T> | TSApiDatabaseProperties<T> | InnerDependentApiProperties<T>,
     customPath = ""
 ) =>
     new HttpApi(scope, `ProxyCorsHttpApi-${props.apiName}-${customPath}${props.deployFor}`, {
@@ -96,7 +96,7 @@ const createHttpApi = <T extends ApiDefinition>(
 
 const addDatabaseProperties =
     <R extends ApiDefinition>(
-        props: TSApiDatabaseProperties<R> | DependentApiProperties<R>,
+        props: TSApiDatabaseProperties<R> | InnerDependentApiProperties<R>,
         lambdaProps: NodejsFunctionProps,
         vpc: Vpc,
         database: DatabaseInstance,
@@ -139,7 +139,7 @@ const connectLambdaToDatabase =
 
 const createLambda = <R extends ApiDefinition>(
     scope: Construct,
-    props: TSApiPlainProperties<R> | TSApiDatabaseProperties<R> | DependentApiProperties<R>,
+    props: TSApiPlainProperties<R> | TSApiDatabaseProperties<R> | InnerDependentApiProperties<R>,
     subPath: string,
     sharedLayer: LayerVersion,
     key: string,
@@ -222,7 +222,7 @@ const createLambda = <R extends ApiDefinition>(
 const connectLambda =
     <R extends ApiDefinition>(
         scope: Construct,
-        props: TSApiPlainProperties<R> | TSApiDatabaseProperties<R> | DependentApiProperties<R>,
+        props: TSApiPlainProperties<R> | TSApiDatabaseProperties<R> | InnerDependentApiProperties<R>,
         subPath: string,
         httpApi: HttpApi,
         sharedLayer: LayerVersion,
@@ -263,7 +263,7 @@ const connectLambda =
 const createLambdasForApi =
     <R extends ApiDefinition>(
         scope: Construct,
-        props: TSApiPlainProperties<R> | TSApiDatabaseProperties<R> | DependentApiProperties<R>,
+        props: TSApiPlainProperties<R> | TSApiDatabaseProperties<R> | InnerDependentApiProperties<R>,
         subPath: string,
         apiMetadata: ApiMetadata<R>,
         httpApi: HttpApi,
@@ -308,6 +308,10 @@ const createLambdasForApi =
     }
 
 export type DependentApiProperties<T extends ApiDefinition> = TSApiProperties<T> & {
+    parentConstruct: TSApiConstruct<T>
+}
+
+type InnerDependentApiProperties<T extends ApiDefinition> = TSApiProperties<T> & {
     connectDatabase: true,
     database: DatabaseInstance,
     databaseSG: ISecurityGroup,
@@ -330,17 +334,30 @@ export class DependentApiConstruct<T extends ApiDefinition> extends Construct {
     ) {
         super(scope, id)
 
-        this.httpApi = createHttpApi(this, props, kebabToCamel(props.apiMetadata.path.replace("/", "-")))
+        const innerProps = {
+            ...props,
+            parentConstruct: undefined,
+            connectDatabase: true,
+            database: props.parentConstruct.database,
+            databaseSG: props.parentConstruct.databaseSG,
+            lambdaSG: props.parentConstruct.lambdaSG,
+            dbProps: {
+                databaseName: props.parentConstruct.databaseName
+            },
+            vpc: props.parentConstruct.vpc,
+            sharedLayer: props.parentConstruct.sharedLayer
+        } as InnerDependentApiProperties<T>
+        this.httpApi = createHttpApi(this, innerProps, kebabToCamel(innerProps.apiMetadata.path.replace("/", "-")))
 
         this.lambdas = createLambdasForApi(
             this,
-            props, props.apiMetadata.path,
-            props.apiMetadata,
+            innerProps, innerProps.apiMetadata.path,
+            innerProps.apiMetadata,
             this.httpApi,
-            props.sharedLayer,
-            props.lambdaPropertiesTree,
-            props.vpc, props.database, props.databaseSG,
-            props.lambdaSG
+            innerProps.sharedLayer,
+            innerProps.lambdaPropertiesTree,
+            innerProps.vpc, innerProps.database, innerProps.databaseSG,
+            innerProps.lambdaSG
         )
     }
 }

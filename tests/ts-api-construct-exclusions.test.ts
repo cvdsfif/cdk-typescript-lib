@@ -71,15 +71,7 @@ describe("Testing partial exclusions on the API", () => {
                 description: "Dependent typescript API",
                 apiMetadata: (simpleApiS.metadata.members.get("cruel") as ApiMetadata<any>),
                 lambdaPath: "tests/lambda",
-                connectDatabase: true,
-                dbProps: {
-                    databaseName: innerStack.construct.databaseName!
-                },
-                vpc: innerStack.construct.vpc!,
-                sharedLayer: innerStack.construct.sharedLayer!,
-                database: innerStack.construct.database!,
-                databaseSG: innerStack.construct.databaseSG!,
-                lambdaSG: innerStack.construct.lambdaSG!
+                parentConstruct: innerStack.construct
             }
         )
     }
