@@ -1,20 +1,56 @@
 import { ConnectedResources, DatabaseConnection, connectDatabase, connectPostgresDb } from "typizator-handler"
 import { CdkCustomResourceResponse, CloudFormationCustomResourceEvent } from "../../lib/cloud-formation-types"
 
+/**
+ * Successful response of the migration processor
+ */
 export type MigrationResultSuccess = {
+    /**
+     * `true` for migration success
+     */
     successful: true,
+    /**
+     * Order number of the last successful migration
+     */
     lastSuccessful: number
 }
 
+/**
+ * Failure response of the migration processor
+ */
 export type MigrationResultFailure = {
+    /**
+     * `false` for migration failure
+     */
     successful: false,
+    /**
+     * Last order number that was successful during the migration
+     */
     lastSuccessful: number,
+    /**
+     * Details of the error occured
+     */
     errorMessage: string
 }
 
+/**
+ * Classes implementing this process to database schema creation and migration
+ */
 export type MigrationProcessor = {
+    /**
+     * Called the first time the processor is called. Usually creates the migration log table to store the state of the migration
+     * @param db Connection to the database to migrate
+     */
     initialize: (db: DatabaseConnection) => Promise<void>,
+    /**
+     * Effectively migrated to the last requested state of the database
+     * @param db Connection to the database to migrate
+     * @returns Result of the migration
+     */
     migrate: (db: DatabaseConnection) => Promise<MigrationResultSuccess | MigrationResultFailure>
+    /**
+     * Name of the migration log table used.
+     */
     get migrationTableName(): string
 }
 
@@ -61,8 +97,15 @@ const migrationUpdate = async (
         )
     return successResponse(`Last migration: ${result.lastSuccessful}`, eventResourceId, event)
 }
-
+/**
+ * 
+ * @param migrationProcessor Returns the migration handler that can be connected to the CDK stack as a custom migration service
+ * @returns Handler than can be connected to the default entry point to the custom resource lambda
+ */
 export const postgresMigrationHandler =
+    /**
+     * Instance of the migration processor to use for the migration
+     */
     (migrationProcessor: MigrationProcessor):
         (event: CloudFormationCustomResourceEvent) => Promise<CdkCustomResourceResponse> => {
         const fn = async (event: CloudFormationCustomResourceEvent) => {

@@ -1,12 +1,23 @@
 import { ObjectS, Schema, SchemaDefinition } from "typizator";
 import { camelToSnake } from "typizator-handler";
 
+/**
+ * Flat structure extracting the types from a schema definition to allow overriding SQL data types for the table creation
+ */
 export type DbMetadata<T extends SchemaDefinition> = {
     [K in keyof T]?: {
         dataType?: string
     }
 }
 
+/**
+ * Creates a PostgreSQL table CREATE statement from the `typizator` schema
+ * @param schema Source schema
+ * @param tableName Name of the table to create
+ * @param primaryKeys List of primary keys for the table
+ * @param metadata Lets override the SQL data types for some of the table's columns matching the schema's fields
+ * @returns SQL CREATE statement. Not to be used for migrations because you cannot ensure the immutability of the target table
+ */
 export const generateCreateStatement = <T extends SchemaDefinition>(
     schema: ObjectS<T>,
     tableName: string,

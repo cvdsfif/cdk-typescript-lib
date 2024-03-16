@@ -14,20 +14,72 @@ import { readFileSync } from "fs";
 import { CronOptions, Rule, RuleTargetInput, Schedule } from "aws-cdk-lib/aws-events";
 import { LambdaFunction } from "aws-cdk-lib/aws-events-targets";
 
+/**
+ * Extended properties for the stack creation.
+ * Allow to define the deployment target (production, staging, test...)
+ */
 export interface ExtendedStackProps extends StackProps {
+    /**
+     * Deployment target that will be a part of the names of CDK resources created by the stack. Allows to deploy different versions of the stack side-by-side
+     */
     deployFor: string
 }
 
+/**
+ * Properties of the lambda function created on the stack
+ */
 export type LambdaProperties = {
+    /**
+     * Overrides the default properties of the NodejsFunction created
+     * 
+     * The actual defaults are, in addition to those defined by CDK:
+     * - entry: `{lambdaPath}/{lambdaName}.ts`, where {lambdaPath} defined in `TSApiProperties` and {lambdaName} is the name of the API function implemented converted to _kebab-case_
+     * - handler: name of the implemented API function in _camelCase_
+     * - description: created automatically from the implemented API function name and environment type (production, staging...)
+     * - runtime: as defined by the `DEFAULT_RUNTIME` constant in this module
+     * - memorySize: 256M
+     * - architecture: as defined by the `DEFAULT_ARCHITECTURE` constant in this module
+     * - timeout: 60 seconds
+     * - loggroup: default one, created by the construct
+     * - layers: default shared layer created by the construct plus eventually the layers defined in the `extraLayers` properties. It is better not to override this default.
+     * - bundling: minified with source map. It is better not to override this parameter directly but rather use the `extraBundling` properties
+     * - environment: merge of environment variables defined at different levels. Better not to override this directly
+     */
     nodejsFunctionProps?: Partial<NodejsFunctionProps>,
+    /**
+     * Overrides the default properties of the log group
+     */
     logGroupProps?: LogGroupProps,
+    /**
+     * Bundling parameters for esbuild transpiling the Typescript source into Javascript. Use this instead of overriding `bundling` directly to avoid breaking other defaults
+     * 
+     * The actual defaults are:
+     * - minify: true
+     * - sourceMap: true
+     */
     extraBundling?: Partial<BundlingOptions>,
+    /**
+     * Lambda layers to add to the stack, in addition to the default one
+     */
     extraLayers?: LayerVersion[],
+    /**
+     * Schedule on which to call the lambda
+     */
     schedules?: [{
+        /**
+         * Cron options defining when to schedule the lambda function call
+         */
         cron: CronOptions,
+        /**
+         * Stringified JSON object to send to the function as an argument
+         */
         eventBody?: string
     }]
 }
+
+/**
+ * Tree allowing to assign a specific set of properties to every lambda present on the API. Matches the structure of the API for the construct, each field corresponding to the function name  contains an instance of `LambdaProperties`
+ */
 export type LambdaPropertiesTree<T extends ApiDefinition> = {
     [K in keyof T]?:
     T[K] extends ApiDefinition ?
@@ -35,31 +87,106 @@ export type LambdaPropertiesTree<T extends ApiDefinition> = {
     LambdaProperties
 }
 
+/**
+ * Properties defining how the stack is constructed from the `typizator` API definition
+ */
 export type TSApiProperties<T extends ApiDefinition> = {
+    /**
+     * Destination environment, i.e. production, staging, dev etc...
+     */
     deployFor: string,
+    /**
+     * API name (unique for your AWS account)
+     */
     apiName: string,
+    /**
+     * Human-readable description of the API
+     */
     description: string,
+    /**
+     * Metadata of the `typizator` API holding its structure and defining what lambdas to create to implement the API
+     */
     apiMetadata: ApiMetadata<T>,
+    /**
+     * Path to the lambda implementation files, relative to your project's root
+     */
     lambdaPath: string,
+    /**
+     * CDK properties overriding the defaults, as defined in `NodejsFunctionProps`. If you want to define individual properties for some functions, use `lambdaPropertiesTree`
+     */
     lambdaProps?: NodejsFunctionProps,
+    /**
+     * CDK properties overriding the log group, as defined in `NodejsFunctionProps`
+     */
     logGroupProps?: LogGroupProps,
+    /**
+     * Path to the lambda layer, relative to your project's root
+     */
     sharedLayerPath?: string,
+    /**
+     * List of additional layers to inject into the stack
+     */
     extraLayers?: LayerVersion[],
+    /**
+     * Additional bundling options for all the lambdas
+     */
     extraBundling?: Partial<BundlingOptions>,
+    /**
+     * Tree of optional additional properties that you can define for any function of your API
+     */
     lambdaPropertiesTree?: LambdaPropertiesTree<T>,
+    /**
+     * Packages to _not_ to bundle with the lambdas. Usually those already present on AWS and those you put on your shared layer
+     */
     apiExclusions?: string[]
 }
 
+/**
+ * Properties for lambdas without database connection
+ */
 export type TSApiPlainProperties<T extends ApiDefinition> = TSApiProperties<T> & {
+    /**
+     * Discriminator saying that the construct will not create a database connection to share between lambdas
+     */
     connectDatabase: false
 }
 
+/**
+ * Properties for lambdas with database connection
+ */
 export type TSApiDatabaseProperties<T extends ApiDefinition> = TSApiProperties<T> & {
+    /**
+     * Discriminator saying that the construct will not create a database connection to share between lambdas
+     */
     connectDatabase: true,
+    /**
+     * Name of the lambda function ensuring the database schema creation and its migration after updates
+     */
     migrationLambda?: string,
+    /**
+     * Path to the migrtion lambda. Usually the same as for the other lambdas
+     */
     migrationLambdaPath?: string,
+    /**
+     * Properties of the database overriding the defaults of the construct and of CDK
+     * 
+     * The actual construct's defaults are:
+     * - engine: Postgres 16, latest minor version
+     * - instanceType: t3micro
+     * - vpc: created inside the construct
+     * - securityGroups: creted inside the construct
+     * - credentials: generated and stored in AWS secret ("postgres")
+     * - allocatedStorage: 10Gb
+     * - maxAllocatedStorage: 50Gb
+     */
     dbProps: Partial<Omit<DatabaseInstanceProps, "databaseName">> & { databaseName: string },
+    /**
+     * If defined, creates a Bastion Linux server for manual access to the database through an SSH tunnel
+     */
     bastion?: {
+        /**
+         * List of CIDR IP addresses defining who can access the bastion
+         */
         openTo: string[] & { 0: string }
     }
 }
@@ -78,12 +205,21 @@ const requireHereAndUp: any = (path: string, level = 0) => {
     }
 }
 
+/**
+ * Tree matching the API tree containing CDK lambda functions definitions once the stack is created
+ */
 export type ApiLambdas<T extends ApiDefinition> = {
     [K in keyof T]: T[K] extends ApiDefinition ? ApiLambdas<T[K]> : NodejsFunction
 }
 
-const DEFAULT_ARCHITECTURE = Architecture.ARM_64
-const DEFAULT_RUNTIME = Runtime.NODEJS_20_X;
+/**
+ * Default architecture for the lambdas created
+ */
+export const DEFAULT_ARCHITECTURE = Architecture.ARM_64
+/**
+ * Default NodeJS runtime for the lambdas created
+ */
+export const DEFAULT_RUNTIME = Runtime.NODEJS_20_X;
 
 const createHttpApi = <T extends ApiDefinition>(
     scope: Construct,
@@ -307,7 +443,13 @@ const createLambdasForApi =
         return lambdas;
     }
 
+/**
+ * Specific properties for the dependent API
+ */
 export type DependentApiProperties<T extends ApiDefinition> = TSApiProperties<T> & {
+    /**
+     * Reference of the parent construct to connect to. The construct must connect the API to a database
+     */
     parentConstruct: TSApiConstruct<T>
 }
 
@@ -323,10 +465,25 @@ type InnerDependentApiProperties<T extends ApiDefinition> = TSApiProperties<T> &
     sharedLayer: LayerVersion
 }
 
+/**
+ * Dependent construct allowing to host parts of the API on a different HTTP API endpoint and deploy it as a separate stack
+ */
 export class DependentApiConstruct<T extends ApiDefinition> extends Construct {
+    /**
+     * Once the stack is created, contains the HTTP API used by its lambda function as an external entry point
+     */
     readonly httpApi: HttpApi
+    /**
+     * Tree of lambdas created by this construct
+     */
     readonly lambdas: ApiLambdas<T>
 
+    /**
+     * Creates the ready to deploy construct
+     * @param scope Parent scope (usually `this` of the holding stack)
+     * @param id Stack ID, unique for your AWS account
+     * @param props Properties, as defined for `DependentApiProperties`
+     */
     constructor(
         scope: Construct,
         id: string,
@@ -362,14 +519,41 @@ export class DependentApiConstruct<T extends ApiDefinition> extends Construct {
     }
 }
 
+/**
+ * Creates the main stack implementing your `typizator`-defined API
+ */
 export class TSApiConstruct<T extends ApiDefinition> extends Construct {
+    /**
+     * HTTP API enpoint created by the construct
+     */
     readonly httpApi: HttpApi
+    /**
+     * Tree of lambdas created by the construct
+     */
     readonly lambdas: ApiLambdas<T>
+    /**
+     * Database instace created by the construct
+     */
     readonly database?: DatabaseInstance
+    /**
+     * Security group attached to the database instance created by the construct
+     */
     readonly databaseSG?: SecurityGroup
+    /**
+     * Security group for the database-connected lambdas created by the construct
+     */
     readonly lambdaSG?: SecurityGroup
+    /**
+     * VPC created by the construct holding its resources
+     */
     readonly vpc?: Vpc
+    /**
+     * Lambda layers that all the construct's (and dependent constructs') lambdas can access
+     */
     readonly sharedLayer?: LayerVersion
+    /**
+     * Name of the database created
+     */
     readonly databaseName?: string
 
     private listLambdaArchitectures =
@@ -398,6 +582,12 @@ export class TSApiConstruct<T extends ApiDefinition> extends Construct {
                 })
         }
 
+    /**
+     * Creates the construct
+     * @param scope Parent scope, usually holging stack
+     * @param id ID of the construct, has to be unique for your AWS account
+     * @param props Properties, as defining in the corresponding types
+     */
     constructor(scope: Construct, id: string, props: TSApiPlainProperties<T> | TSApiDatabaseProperties<T>) {
         super(scope, id)
 
