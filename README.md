@@ -14,6 +14,8 @@ npm i cdk-typescript-lib
 
 ## Documentation
 
+> There is a tutorial explaining in details how to use this library and to connect it to the web client [here](https://medium.com/@cvds.eu/typescript-api-implementing-with-aws-cdk-and-using-on-a-web-client-2e3fe55a2f7b?sk=7f56e4bae87f46f4d774220d2f6ea95d)
+
 ### Single CDK stack API implementation
 
 Let's imagine a very simple two-methods API to implement, defined as `typizator` schema:
