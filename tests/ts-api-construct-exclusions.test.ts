@@ -69,7 +69,7 @@ describe("Testing partial exclusions on the API", () => {
                 ...props,
                 apiName: "TSDependentTestApi",
                 description: "Dependent typescript API",
-                apiMetadata: (simpleApiS.metadata.members.get("cruel") as ApiMetadata<any>),
+                apiMetadata: simpleApiS.metadata.implementation.cruel.metadata,
                 lambdaPath: "tests/lambda",
                 parentConstruct: innerStack.construct
             }

@@ -411,7 +411,8 @@ const createLambdasForApi =
         lambdaSG?: ISecurityGroup
     ) => {
         const lambdas = {} as ApiLambdas<R>;
-        for (const [key, data] of apiMetadata.members) {
+        for (const key of Object.keys(apiMetadata.implementation)) {
+            const data = (apiMetadata.implementation as any)[key].metadata
             if (props.apiExclusions?.includes((data as NamedMetadata).path)) continue
             const keyKebabCase = camelToKebab(key as string);
             if (data.dataType === "api")
@@ -450,7 +451,7 @@ export type DependentApiProperties<T extends ApiDefinition> = TSApiProperties<T>
     /**
      * Reference of the parent construct to connect to. The construct must connect the API to a database
      */
-    parentConstruct: TSApiConstruct<T>
+    parentConstruct: TSApiConstruct<any>
 }
 
 type InnerDependentApiProperties<T extends ApiDefinition> = TSApiProperties<T> & {

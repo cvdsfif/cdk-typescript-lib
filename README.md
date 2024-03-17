@@ -249,7 +249,7 @@ const childConstruct = new DependentApiConstruct(this, "ChildApi", {
     ...otherOptionalProps,
     apiName: "TSDependentTestApi",
     description: "Dependent typescript API",
-    apiMetadata: (api.metadata.members.get("subGroup") as ApiMetadata<any>),
+    apiMetadata: api.metadata.implementation.subGroup,
     lambdaPath: "lambda", // You can change this for another directory if you want
     // Your parent construct must be inside its own stack in inherit the information on its components, including the database connection
     parentConstruct: parentStack.construct
