@@ -41,5 +41,8 @@
     "pg": "^8.11.3",
     "typizator": "^2.3.0",
     "typizator-handler": "^1.0.1"
+  },
+  "engines": {
+    "node": ">=20.0.0"
   }
 }
