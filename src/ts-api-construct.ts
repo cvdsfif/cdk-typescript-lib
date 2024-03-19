@@ -466,6 +466,54 @@ type InnerDependentApiProperties<T extends ApiDefinition> = TSApiProperties<T> &
     sharedLayer: LayerVersion
 }
 
+const listLambdaArchitectures =
+    <T extends ApiDefinition>(initialSet: Set<Architecture>, lambdaPropertiesTree?: LambdaPropertiesTree<T>, depth = 0) => {
+        if (!lambdaPropertiesTree || depth++ > DEFAULT_SEARCH_DEPTH) return;
+        Object.keys(lambdaPropertiesTree)
+            .forEach(key => {
+                if ((lambdaPropertiesTree as any)[key]) {
+                    if ((lambdaPropertiesTree as any)[key]?.nodejsFunctionProps?.architecture)
+                        initialSet.add((lambdaPropertiesTree as any)[key]?.nodejsFunctionProps?.architecture)
+                    else listLambdaArchitectures(initialSet, (lambdaPropertiesTree as any)[key], depth)
+                }
+            })
+    }
+
+const listLambdaRuntimes =
+    <T extends ApiDefinition>(initialSet: Set<Runtime>, lambdaPropertiesTree?: LambdaPropertiesTree<T>, depth = 0) => {
+        if (!lambdaPropertiesTree || depth++ > DEFAULT_SEARCH_DEPTH) return;
+        Object.keys(lambdaPropertiesTree)
+            .forEach(key => {
+                if ((lambdaPropertiesTree as any)[key]) {
+                    if ((lambdaPropertiesTree as any)[key]?.nodejsFunctionProps?.runtime)
+                        initialSet.add((lambdaPropertiesTree as any)[key]?.nodejsFunctionProps?.runtime)
+                    else listLambdaRuntimes(initialSet, (lambdaPropertiesTree as any)[key], depth)
+                }
+            })
+    }
+
+const createSharedLayerForConstruct = <T extends ApiDefinition>(
+    scope: Construct,
+    apiName: string,
+    deployFor: string,
+    lambdaPath: string,
+    sharedLayerPath?: string,
+    lambdaProps?: NodejsFunctionProps,
+    lambdaPropertiesTree?: LambdaPropertiesTree<T>
+) => {
+    const architecturesSet = new Set<Architecture>([DEFAULT_ARCHITECTURE]);
+    if (lambdaProps?.architecture) architecturesSet.add(lambdaProps.architecture);
+    listLambdaArchitectures(architecturesSet, lambdaPropertiesTree);
+    const runtimesSet = new Set<Runtime>([DEFAULT_RUNTIME]);
+    if (lambdaProps?.runtime) runtimesSet.add(lambdaProps.runtime);
+    listLambdaRuntimes(runtimesSet, lambdaPropertiesTree);
+    return new LayerVersion(scope, `SharedLayer-${apiName}-${deployFor}`, {
+        code: Code.fromAsset(sharedLayerPath ?? `${lambdaPath}/shared-layer`),
+        compatibleArchitectures: [...architecturesSet],
+        compatibleRuntimes: [...runtimesSet]
+    })
+}
+
 /**
  * Dependent construct allowing to host parts of the API on a different HTTP API endpoint and deploy it as a separate stack
  */
@@ -478,6 +526,8 @@ export class DependentApiConstruct<T extends ApiDefinition> extends Construct {
      * Tree of lambdas created by this construct
      */
     readonly lambdas: ApiLambdas<T>
+
+    private readonly sharedLayer: LayerVersion
 
     /**
      * Creates the ready to deploy construct
@@ -492,6 +542,16 @@ export class DependentApiConstruct<T extends ApiDefinition> extends Construct {
     ) {
         super(scope, id)
 
+        this.sharedLayer = createSharedLayerForConstruct(
+            this,
+            props.apiName,
+            props.deployFor,
+            props.lambdaPath,
+            props.sharedLayerPath,
+            props.lambdaProps,
+            props.lambdaPropertiesTree
+        )
+
         const innerProps = {
             ...props,
             parentConstruct: undefined,
@@ -503,7 +563,7 @@ export class DependentApiConstruct<T extends ApiDefinition> extends Construct {
                 databaseName: props.parentConstruct.databaseName
             },
             vpc: props.parentConstruct.vpc,
-            sharedLayer: props.parentConstruct.sharedLayer
+            sharedLayer: this.sharedLayer
         } as InnerDependentApiProperties<T>
         this.httpApi = createHttpApi(this, innerProps, kebabToCamel(innerProps.apiMetadata.path.replace("/", "-")))
 
@@ -549,39 +609,11 @@ export class TSApiConstruct<T extends ApiDefinition> extends Construct {
      */
     readonly vpc?: Vpc
     /**
-     * Lambda layers that all the construct's (and dependent constructs') lambdas can access
-     */
-    readonly sharedLayer?: LayerVersion
-    /**
      * Name of the database created
      */
     readonly databaseName?: string
 
-    private listLambdaArchitectures =
-        <T extends ApiDefinition>(initialSet: Set<Architecture>, lambdaPropertiesTree?: LambdaPropertiesTree<T>, depth = 0) => {
-            if (!lambdaPropertiesTree || depth++ > DEFAULT_SEARCH_DEPTH) return;
-            Object.keys(lambdaPropertiesTree)
-                .forEach(key => {
-                    if ((lambdaPropertiesTree as any)[key]) {
-                        if ((lambdaPropertiesTree as any)[key]?.nodejsFunctionProps?.architecture)
-                            initialSet.add((lambdaPropertiesTree as any)[key]?.nodejsFunctionProps?.architecture)
-                        else this.listLambdaArchitectures(initialSet, (lambdaPropertiesTree as any)[key], depth)
-                    }
-                })
-        }
-
-    private listLambdaRuntimes =
-        <T extends ApiDefinition>(initialSet: Set<Runtime>, lambdaPropertiesTree?: LambdaPropertiesTree<T>, depth = 0) => {
-            if (!lambdaPropertiesTree || depth++ > DEFAULT_SEARCH_DEPTH) return;
-            Object.keys(lambdaPropertiesTree)
-                .forEach(key => {
-                    if ((lambdaPropertiesTree as any)[key]) {
-                        if ((lambdaPropertiesTree as any)[key]?.nodejsFunctionProps?.runtime)
-                            initialSet.add((lambdaPropertiesTree as any)[key]?.nodejsFunctionProps?.runtime)
-                        else this.listLambdaRuntimes(initialSet, (lambdaPropertiesTree as any)[key], depth)
-                    }
-                })
-        }
+    private readonly sharedLayer?: LayerVersion
 
     /**
      * Creates the construct
@@ -594,17 +626,15 @@ export class TSApiConstruct<T extends ApiDefinition> extends Construct {
 
         this.httpApi = createHttpApi(this, props)
 
-        const architecturesSet = new Set<Architecture>([DEFAULT_ARCHITECTURE]);
-        if (props.lambdaProps?.architecture) architecturesSet.add(props.lambdaProps?.architecture);
-        this.listLambdaArchitectures(architecturesSet, props.lambdaPropertiesTree);
-        const runtimesSet = new Set<Runtime>([DEFAULT_RUNTIME]);
-        if (props.lambdaProps?.runtime) runtimesSet.add(props.lambdaProps?.runtime);
-        this.listLambdaRuntimes(runtimesSet, props.lambdaPropertiesTree);
-        this.sharedLayer = new LayerVersion(this, `SharedLayer-${props.apiName}-${props.deployFor}`, {
-            code: Code.fromAsset(props.sharedLayerPath ?? `${props.lambdaPath}/shared-layer`),
-            compatibleArchitectures: [...architecturesSet],
-            compatibleRuntimes: [...runtimesSet]
-        })
+        this.sharedLayer = createSharedLayerForConstruct(
+            this,
+            props.apiName,
+            props.deployFor,
+            props.lambdaPath,
+            props.sharedLayerPath,
+            props.lambdaProps,
+            props.lambdaPropertiesTree
+        )
 
         if (props.connectDatabase) {
             const vpc = this.vpc = new Vpc(this, `VPC-${props.apiName}-${props.deployFor}`, { natGateways: 1 })
