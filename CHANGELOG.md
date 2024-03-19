@@ -5,6 +5,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
+Separate shared layers for dependent constructs. This is needed to avoid layer versions conflicts on separate deployments
 
 ## 1.1.0 - 2024-03-17
 Dependencies updated and deprecated `members` metadata property usage removed
