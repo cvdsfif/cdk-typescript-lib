@@ -1,6 +1,6 @@
 import { App, Stack } from "aws-cdk-lib";
 import { Construct } from "constructs";
-import { ApiDefinition, ApiMetadata } from "typizator";
+import { ApiDefinition } from "typizator";
 import { DependentApiProperties, DependentApiConstruct, ExtendedStackProps, TSApiConstruct, TSApiPlainProperties, TSApiDatabaseProperties } from "../src/ts-api-construct";
 import { Match, Template } from "aws-cdk-lib/assertions";
 import { simpleApiS } from "./lambda/shared/simple-api-definition";
@@ -114,6 +114,7 @@ describe("Testing partial exclusions on the API", () => {
     })
 
     test("Dependent stack constructs and takes resources from the main one with separate HTTP api", async () => {
+        init()
         const dependentTemplate = Template.fromStack(dependentStack)
         dependentTemplate.hasResourceProperties("AWS::Lambda::Function",
             Match.objectLike({

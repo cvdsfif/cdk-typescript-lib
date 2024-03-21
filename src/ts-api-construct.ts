@@ -1,5 +1,5 @@
 import { CustomResource, Duration, RemovalPolicy, StackProps } from "aws-cdk-lib";
-import { CorsHttpMethod, HttpApi, HttpMethod } from "aws-cdk-lib/aws-apigatewayv2";
+import { CorsHttpMethod, DomainName, HttpApi, HttpMethod } from "aws-cdk-lib/aws-apigatewayv2";
 import { HttpLambdaIntegration } from "aws-cdk-lib/aws-apigatewayv2-integrations";
 import { BastionHostLinux, ISecurityGroup, InstanceClass, InstanceSize, InstanceType, Peer, Port, SecurityGroup, SubnetType, Vpc } from "aws-cdk-lib/aws-ec2";
 import { Architecture, Code, LayerVersion, Runtime } from "aws-cdk-lib/aws-lambda";
@@ -13,6 +13,9 @@ import { Provider } from "aws-cdk-lib/custom-resources";
 import { readFileSync } from "fs";
 import { CronOptions, Rule, RuleTargetInput, Schedule } from "aws-cdk-lib/aws-events";
 import { LambdaFunction } from "aws-cdk-lib/aws-events-targets";
+import { ARecord, HostedZone, IHostedZone, RecordTarget } from "aws-cdk-lib/aws-route53";
+import { Certificate, CertificateValidation } from "aws-cdk-lib/aws-certificatemanager";
+import { ApiGatewayv2DomainProperties } from "aws-cdk-lib/aws-route53-targets";
 
 /**
  * Extended properties for the stack creation.
@@ -138,7 +141,40 @@ export type TSApiProperties<T extends ApiDefinition> = {
     /**
      * Packages to _not_ to bundle with the lambdas. Usually those already present on AWS and those you put on your shared layer
      */
-    apiExclusions?: string[]
+    apiExclusions?: string[],
+    /**
+     * Configures a custom domain name for the HTTP API managed by the construct.
+     * It must belong to a zone that you host on Route53
+     * 
+     * @example
+     * ```ts
+     * {    // For api.example.org:
+     *      hostedZoneName: "example.org",
+     *      domainNamePrefix: "api"
+     * }
+     * ```
+     */
+    apiDomainData?: {
+        /**
+         * Domain name that belongs to you 
+         */
+        hostedZoneName: string,
+        /**
+         * Domain name prefix.
+         */
+        domainNamePrefix: string,
+        /**
+         * This can be used in few very limited cases like advanced testing. Replaces the standard procedure of domain lookup
+         * @param scope CDK construct context
+         * @param props Properties for the API creation
+         * @param customPath If not empty, the path to add to the end of the API HTTP entry point. Used essentially for dependent constructs
+         * @returns New hosted zone
+         */
+        customDomainLookup?: (
+            scope: Construct,
+            props: TSApiPlainProperties<T> | TSApiDatabaseProperties<T>,
+            customPath: string) => IHostedZone
+    }
 }
 
 /**
@@ -221,14 +257,52 @@ export const DEFAULT_ARCHITECTURE = Architecture.ARM_64
  */
 export const DEFAULT_RUNTIME = Runtime.NODEJS_20_X;
 
+const lookupHostedZone = <T extends ApiDefinition>(
+    scope: Construct,
+    props: TSApiPlainProperties<T> | TSApiDatabaseProperties<T>,
+    customPath: string) =>
+    HostedZone.fromLookup(scope, `parent-zone-${props.apiName}-${customPath}${props.deployFor}`, {
+        domainName: props.apiDomainData!.hostedZoneName
+    })
+
+
 const createHttpApi = <T extends ApiDefinition>(
     scope: Construct,
     props: TSApiPlainProperties<T> | TSApiDatabaseProperties<T> | InnerDependentApiProperties<T>,
     customPath = ""
-) =>
-    new HttpApi(scope, `ProxyCorsHttpApi-${props.apiName}-${customPath}${props.deployFor}`, {
+) => {
+    if (!props.apiDomainData) return new HttpApi(scope, `ProxyCorsHttpApi-${props.apiName}-${customPath}${props.deployFor}`, {
         corsPreflight: { allowMethods: [CorsHttpMethod.ANY], allowOrigins: ['*'], allowHeaders: ['*'] },
     })
+    const hostedZone = props.apiDomainData.customDomainLookup ?
+        props.apiDomainData.customDomainLookup(scope, props, customPath) :
+        lookupHostedZone(scope, props, customPath)
+    const domainName = `${props.apiDomainData.domainNamePrefix}.${props.apiDomainData.hostedZoneName}`
+    const certificate = new Certificate(scope, `api-certificate-${props.apiName}-${customPath}${props.deployFor}`, {
+        domainName,
+        validation: CertificateValidation.fromDns(hostedZone)
+    })
+    const domain = new DomainName(scope, `domain-${props.apiName}-${customPath}${props.deployFor}`, {
+        domainName, certificate
+    })
+    const api = new HttpApi(scope, `ProxyCorsHttpApi-${props.apiName}-${customPath}${props.deployFor}`, {
+        corsPreflight: { allowMethods: [CorsHttpMethod.ANY], allowOrigins: ['*'], allowHeaders: ['*'] },
+        defaultDomainMapping: {
+            domainName: domain
+        }
+    })
+    new ARecord(scope, `arecord-${props.apiName}-${customPath}${props.deployFor}`, {
+        recordName: props.apiDomainData.domainNamePrefix,
+        zone: hostedZone,
+        target: RecordTarget.fromAlias(
+            new ApiGatewayv2DomainProperties(
+                domain.regionalDomainName,
+                domain.regionalHostedZoneId
+            )
+        )
+    })
+    return api
+}
 
 const addDatabaseProperties =
     <R extends ApiDefinition>(
