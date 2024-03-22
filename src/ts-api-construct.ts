@@ -271,9 +271,15 @@ const createHttpApi = <T extends ApiDefinition>(
     props: TSApiPlainProperties<T> | TSApiDatabaseProperties<T> | InnerDependentApiProperties<T>,
     customPath = ""
 ) => {
-    if (!props.apiDomainData) return new HttpApi(scope, `ProxyCorsHttpApi-${props.apiName}-${customPath}${props.deployFor}`, {
-        corsPreflight: { allowMethods: [CorsHttpMethod.ANY], allowOrigins: ['*'], allowHeaders: ['*'] },
-    })
+    if (!props.apiDomainData) {
+        const api = new HttpApi(scope, `ProxyCorsHttpApi-${props.apiName}-${customPath}${props.deployFor}`, {
+            corsPreflight: { allowMethods: [CorsHttpMethod.ANY], allowOrigins: ['*'], allowHeaders: ['*'] },
+        })
+        return ({
+            api,
+            domainName: api.url
+        })
+    }
     const hostedZone = props.apiDomainData.customDomainLookup ?
         props.apiDomainData.customDomainLookup(scope, props, customPath) :
         lookupHostedZone(scope, props, customPath)
@@ -291,7 +297,7 @@ const createHttpApi = <T extends ApiDefinition>(
             domainName: domain
         }
     })
-    new ARecord(scope, `arecord-${props.apiName}-${customPath}${props.deployFor}`, {
+    const arecord = new ARecord(scope, `arecord-${props.apiName}-${customPath}${props.deployFor}`, {
         recordName: props.apiDomainData.domainNamePrefix,
         zone: hostedZone,
         target: RecordTarget.fromAlias(
@@ -301,7 +307,10 @@ const createHttpApi = <T extends ApiDefinition>(
             )
         )
     })
-    return api
+    return {
+        api,
+        domainName: arecord.domainName
+    }
 }
 
 const addDatabaseProperties =
@@ -597,6 +606,10 @@ export class DependentApiConstruct<T extends ApiDefinition> extends Construct {
      */
     readonly httpApi: HttpApi
     /**
+     * URL used to access the API
+     */
+    readonly apiUrl: string
+    /**
      * Tree of lambdas created by this construct
      */
     readonly lambdas: ApiLambdas<T>
@@ -639,7 +652,9 @@ export class DependentApiConstruct<T extends ApiDefinition> extends Construct {
             vpc: props.parentConstruct.vpc,
             sharedLayer: this.sharedLayer
         } as InnerDependentApiProperties<T>
-        this.httpApi = createHttpApi(this, innerProps, kebabToCamel(innerProps.apiMetadata.path.replace("/", "-")))
+        const apiInfo = createHttpApi(this, innerProps, kebabToCamel(innerProps.apiMetadata.path.replace("/", "-")))
+        this.httpApi = apiInfo.api
+        this.apiUrl = apiInfo.domainName!
 
         this.lambdas = createLambdasForApi(
             this,
@@ -662,6 +677,10 @@ export class TSApiConstruct<T extends ApiDefinition> extends Construct {
      * HTTP API enpoint created by the construct
      */
     readonly httpApi: HttpApi
+    /**
+     * URL used to access the API
+     */
+    readonly apiUrl: string
     /**
      * Tree of lambdas created by the construct
      */
@@ -698,7 +717,9 @@ export class TSApiConstruct<T extends ApiDefinition> extends Construct {
     constructor(scope: Construct, id: string, props: TSApiPlainProperties<T> | TSApiDatabaseProperties<T>) {
         super(scope, id)
 
-        this.httpApi = createHttpApi(this, props)
+        const apiInfo = createHttpApi(this, props)
+        this.httpApi = apiInfo.api
+        this.apiUrl = apiInfo.domainName!
 
         this.sharedLayer = createSharedLayerForConstruct(
             this,
