@@ -231,6 +231,22 @@ export type TSApiDatabaseProperties<T extends ApiDefinition> = TSApiProperties<T
     }
 }
 
+/**
+ * Creates a test mock of the hosted zone lookup
+ * @param scope CDK construct scope. `this` from the stack for example
+ * @param _ Not used in the mock implementation 
+ * @param _1  Not used in the mock implementation
+ * @returns Hosted zone that can be used in the test synthesis
+ */
+export const customDomainLookupMock = <T extends ApiDefinition>(
+    scope: Construct,
+    _: TSApiPlainProperties<T> | TSApiDatabaseProperties<T>,
+    _1: string) => {
+    return HostedZone
+        .fromHostedZoneAttributes(scope, "R53Domain",
+            { hostedZoneId: "ID", zoneName: "test.com" })
+}
+
 const camelToKebab = (src: string | String) => src.replace(/[A-Z]/g, match => `-${match.toLowerCase()}`)
 const kebabToCamel = (src: string | String) => src.replace(/(?:_|-| |\b)(\w)/g, (_, p1) => p1.toUpperCase())
 

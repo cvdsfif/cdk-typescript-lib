@@ -1,7 +1,7 @@
 import { App, Stack } from "aws-cdk-lib";
 import { Construct } from "constructs";
 import { ApiDefinition } from "typizator";
-import { ExtendedStackProps, TSApiConstruct, TSApiDatabaseProperties, TSApiPlainProperties } from "../src/ts-api-construct";
+import { ExtendedStackProps, TSApiConstruct, TSApiDatabaseProperties, TSApiPlainProperties, customDomainLookupMock } from "../src/ts-api-construct";
 import { Template } from "aws-cdk-lib/assertions";
 import { simpleApiS } from "./lambda/shared/simple-api-definition";
 import { HostedZone } from "aws-cdk-lib/aws-route53";
@@ -55,14 +55,7 @@ describe("Testing API that is hosted on a separate zone", () => {
                 apiDomainData: {
                     hostedZoneName: "example.com",
                     domainNamePrefix: "test",
-                    customDomainLookup: <T extends ApiDefinition>(
-                        scope: Construct,
-                        props: TSApiPlainProperties<T> | TSApiDatabaseProperties<T>,
-                        customPath: string) => {
-                        return HostedZone
-                            .fromHostedZoneAttributes(scope, "R53Domain",
-                                { hostedZoneId: "ID", zoneName: "test.com" })
-                    }
+                    customDomainLookup: customDomainLookupMock
                 }
             }
         )
