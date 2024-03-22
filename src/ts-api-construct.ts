@@ -58,7 +58,7 @@ export type LambdaProperties = {
      * 
      * The actual defaults are:
      * - minify: true
-     * - sourceMap: true
+     * - sourceMap: false
      */
     extraBundling?: Partial<BundlingOptions>,
     /**
@@ -416,7 +416,7 @@ const createLambda = <R extends ApiDefinition>(
         layers: [sharedLayer, ...(specificLambdaProperties?.extraLayers ?? props.extraLayers ?? [])],
         bundling: {
             minify: true,
-            sourceMap: true,
+            sourceMap: false,
             ...(props.extraBundling ?? {}),
             ...specificLambdaProperties?.extraBundling
         },

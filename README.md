@@ -266,6 +266,53 @@ new CfnOutput(this, `ChildApiURL`, { value: childConstruct.httpApi.url! })
 
 The [typizator-client](https://www.npmjs.com/package/typizator-client) already includes the tools to integrate child APIs, refer to its documentation for details.
 
+### Attaching the API to a custom domain
+
+If you want to use your API on a domain name that belongs to you and in general to use something more readable than a long Amazon default domain name, you have an easy option for that with this library. But first, you need to have your domain hosted on AWS Route 53. You've probably already done it manually for a while, now your task is to create a subdomain and make it point to your API.
+
+For that, in the properties of your construct you have to add the following property:
+
+```ts
+apiDomainData: {
+    hostedZoneName: "yourdomain.com",
+    domainNamePrefix: "api-endpoint"
+}
+```
+
+This will create the `api-endpoint.yourdomain.com` name, create a certificate for it and let you query it with an HTTPS enpoint. The `apiUrl` property of your construct will point in that case to this endpoint, the `httpApi.url` stays available and points to the long and ugly URL from Amazon.
+
+The only problem of this construction is that CDK will expect that your hosted zone name is available on the same AWS account that is used to deploy your CDK stack. It means that during the tests it will try to access this domain which is only possible in a full integration testing context, which is too heavy most of the times.
+
+To solve it, you have to add for your tests the mock version of the domain lookup that will not try to go to the real Route 53 to try managing the domain. For that, the library has a special mock that could be added, on the test version of the stack only, as an extra property for the domain data:
+
+```ts
+apiDomainData: {
+    hostedZoneName: "yourdomain.com",
+    domainNamePrefix: "api-endpoint",
+    customDomainLookup: customDomainLookupMock
+}
+```
+
+That done, your tests will pass.
+
+The other issue is that to work with Route 53 your stack will need to know your AWS account and main region. Let's imagine your main AWS hosting is in London. In that case, you have to add to the properties of your stack something like this:
+
+```ts
+env: {
+    account: "<Your AWS account ID>",
+    region: "eu-west-2"
+}
+```
+
+The problem is that if at that moment you already have a database deployed on the stack (and thus a VPC attached to it), it can disturb your VPC's routing table. To avoid it, you have to explicitly set your VPC's availability zones to those you can find if you look at your VPC configuration in the AWS console. In our "London" case, we have to add to the construct's config the following:
+
+```ts
+vpcProps: {
+    natGateways: 1,
+    availabilityZones: ["eu-west-2a", "eu-west-2b"]
+}
+```
+
 ## Testing
 
 We never test the framework. So once your construct configured, you can consider that it should work as expected. You just need to make sure that the construction passes and there is something on the resulting stack.
