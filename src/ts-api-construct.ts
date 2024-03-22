@@ -219,10 +219,10 @@ export type TSApiDatabaseProperties<T extends ApiDefinition> = TSApiProperties<T
     /**
      * Optional properties of the VPC overriding the default CDK props
      */
-    vpcProps: Partial<VpcProps>,
+    vpcProps?: Partial<VpcProps>,
     /**
      * If defined, creates a Bastion Linux server for manual access to the database through an SSH tunnel
-     */,
+     */
     bastion?: {
         /**
          * List of CIDR IP addresses defining who can access the bastion
