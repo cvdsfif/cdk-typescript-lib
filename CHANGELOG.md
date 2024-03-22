@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Unreleased
 Documentation updated
 
-### Changes
+### Changed
 - `sourceMap` property set to false by default
 
 ## 1.5.0-beta.1 - 2024-03-22
