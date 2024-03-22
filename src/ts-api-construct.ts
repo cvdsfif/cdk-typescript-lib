@@ -309,7 +309,7 @@ const createHttpApi = <T extends ApiDefinition>(
     })
     return {
         api,
-        domainName: arecord.domainName
+        domainName: `https://${arecord.domainName}`
     }
 }
 

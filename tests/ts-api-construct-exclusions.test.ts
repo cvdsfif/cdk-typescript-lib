@@ -129,5 +129,6 @@ describe("Testing partial exclusions on the API", () => {
             "Name": "ProxyCorsHttpApi-TSDependentTestApi-Crueltest",
             "CorsConfiguration": { "AllowMethods": ["*"], "AllowOrigins": ['*'], "AllowHeaders": ['*'] }
         })
+
     })
 })

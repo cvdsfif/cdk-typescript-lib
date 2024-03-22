@@ -8,6 +8,7 @@ import { HostedZone } from "aws-cdk-lib/aws-route53";
 
 describe("Testing API that is hosted on a separate zone", () => {
     class TestStack<T extends ApiDefinition> extends Stack {
+        readonly construct: TSApiConstruct<any>
         constructor(
             scope: Construct,
             id: string,
@@ -15,7 +16,7 @@ describe("Testing API that is hosted on a separate zone", () => {
             apiProps: TSApiPlainProperties<T>,
         ) {
             super(scope, id, props);
-            new TSApiConstruct(this, "SimpleApi", apiProps);
+            this.construct = new TSApiConstruct(this, "SimpleApi", apiProps);
         }
     }
 
@@ -70,5 +71,6 @@ describe("Testing API that is hosted on a separate zone", () => {
         template.hasResourceProperties("AWS::Route53::RecordSet", {
             "Name": "test.test.com."
         })
+        expect(stack.construct.apiUrl).toMatch(/https/)
     })
 })
