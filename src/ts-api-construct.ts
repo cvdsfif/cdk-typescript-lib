@@ -1,7 +1,7 @@
 import { CustomResource, Duration, RemovalPolicy, StackProps } from "aws-cdk-lib";
 import { CorsHttpMethod, DomainName, HttpApi, HttpMethod } from "aws-cdk-lib/aws-apigatewayv2";
 import { HttpLambdaIntegration } from "aws-cdk-lib/aws-apigatewayv2-integrations";
-import { BastionHostLinux, ISecurityGroup, InstanceClass, InstanceSize, InstanceType, Peer, Port, SecurityGroup, SubnetType, Vpc } from "aws-cdk-lib/aws-ec2";
+import { BastionHostLinux, ISecurityGroup, InstanceClass, InstanceSize, InstanceType, Peer, Port, SecurityGroup, SubnetType, Vpc, VpcProps } from "aws-cdk-lib/aws-ec2";
 import { Architecture, Code, LayerVersion, Runtime } from "aws-cdk-lib/aws-lambda";
 import { BundlingOptions, NodejsFunction, NodejsFunctionProps } from "aws-cdk-lib/aws-lambda-nodejs";
 import { LogGroup, LogGroupProps, RetentionDays } from "aws-cdk-lib/aws-logs";
@@ -217,8 +217,12 @@ export type TSApiDatabaseProperties<T extends ApiDefinition> = TSApiProperties<T
      */
     dbProps: Partial<Omit<DatabaseInstanceProps, "databaseName">> & { databaseName: string },
     /**
-     * If defined, creates a Bastion Linux server for manual access to the database through an SSH tunnel
+     * Optional properties of the VPC overriding the default CDK props
      */
+    vpcProps: Partial<VpcProps>,
+    /**
+     * If defined, creates a Bastion Linux server for manual access to the database through an SSH tunnel
+     */,
     bastion?: {
         /**
          * List of CIDR IP addresses defining who can access the bastion
@@ -732,7 +736,10 @@ export class TSApiConstruct<T extends ApiDefinition> extends Construct {
         )
 
         if (props.connectDatabase) {
-            const vpc = this.vpc = new Vpc(this, `VPC-${props.apiName}-${props.deployFor}`, { natGateways: 1 })
+            const vpc = this.vpc = new Vpc(this, `VPC-${props.apiName}-${props.deployFor}`, {
+                natGateways: 1,
+                ...props.vpcProps
+            })
             this.databaseSG = new SecurityGroup(this, `SG-${props.apiName}-${props.deployFor}`, { vpc })
             this.lambdaSG = new SecurityGroup(scope, `TSApiLambdaSG-${props.apiName}-${props.deployFor}`, { vpc })
             this.database = new DatabaseInstance(this, `DB-${props.apiName}-${props.deployFor}`, {
