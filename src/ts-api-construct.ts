@@ -203,6 +203,7 @@ export type TSApiDatabaseProperties<T extends ApiDefinition> = TSApiProperties<T
      * Path to the migrtion lambda. Usually the same as for the other lambdas
      */
     migrationLambdaPath?: string,
+    errorHandlerLambda?: string,
     /**
      * Properties of the database overriding the defaults of the construct and of CDK
      * 
