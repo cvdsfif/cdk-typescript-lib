@@ -39,8 +39,8 @@
     "aws-cdk-lib": "^2.133.0",
     "constructs": "^10.3.0",
     "pg": "^8.11.3",
-    "typizator": "^2.4.0",
-    "typizator-handler": "^1.1.0"
+    "typizator": "^2.4.1",
+    "typizator-handler": "^1.2.1"
   },
   "engines": {
     "node": ">=20.0.0"
