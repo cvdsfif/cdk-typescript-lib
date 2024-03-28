@@ -56,8 +56,8 @@ describe("Testing partial exclusions on the API", () => {
                     }
                 },
                 apiExclusions: [
-                    simpleApiS.metadata.implementation.cruel.path,
-                    simpleApiS.metadata.implementation.noMeow.path
+                    simpleApiS.metadata.implementation.cruel.metadata.path,
+                    simpleApiS.metadata.implementation.noMeow.metadata.path
                 ]
             }
         )
