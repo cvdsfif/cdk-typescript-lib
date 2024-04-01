@@ -726,6 +726,10 @@ export class TSApiConstruct<T extends ApiDefinition> extends Construct {
      * Name of the database created
      */
     readonly databaseName?: string
+    /**
+     * Bastion host resource, if configured
+     */
+    readonly bastion?: BastionHostLinux
 
     private readonly sharedLayer?: LayerVersion
 
@@ -810,16 +814,16 @@ export class TSApiConstruct<T extends ApiDefinition> extends Construct {
             }
 
             if (props.bastion) {
-                const bastion = new BastionHostLinux(
+                this.bastion = new BastionHostLinux(
                     this,
                     `BastionHost-${props.apiName}-${props.deployFor}`, {
                     vpc: this.vpc,
                     instanceType: new InstanceType("t3.nano"),
                     subnetSelection: { subnetType: SubnetType.PUBLIC }
                 })
-                props.bastion.openTo.forEach(address => bastion.allowSshAccessFrom(Peer.ipv4(address)))
+                props.bastion.openTo.forEach(address => this.bastion?.allowSshAccessFrom(Peer.ipv4(address)))
                 this.database.connections.allowFrom(
-                    bastion.connections,
+                    this.bastion.connections,
                     Port.tcp(this.database.instanceEndpoint.port),
                     `${props.apiName} API Bastion connection for the RDP database`
                 )
