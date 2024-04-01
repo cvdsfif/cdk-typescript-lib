@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Unreleased
 Bastion host exposed as a construct property
 
+## 1.7.0 - 2024-03-28
+
 ## 1.6.1 - 2024-03-27
 Dependencies update
 
