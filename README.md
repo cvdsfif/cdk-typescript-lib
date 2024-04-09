@@ -71,7 +71,13 @@ class TestStack<T extends ApiDefinition> extends Stack {
                 // It mimics the structure of your API, but all the entries are optional
                 lambdaPropertiesTree: {
                     subGroup: {
+                        // Here, we limit the access to subGroup and all its children to the 10.0.0.1 IP address
+                        authorizedIps: ["10.0.0.1"],
                         report: {
+                            // Here, we add the binary access mask to the report context.
+                            // It can be checked before each execution through the authentication function
+                            // passed to the lambda handler that implements that API function
+                            accessMask: 0b1000,
                             // For example, we can schedule the function to run every minutes on the AWS cloud
                             schedules: [{
                                 cron: { minute: "0/1" }
