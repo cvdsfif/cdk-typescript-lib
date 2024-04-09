@@ -50,6 +50,8 @@ describe("Testing the behaviour of the Typescript API construct for CDK", () => 
                         }
                     },
                     noMeow: {
+                        authorizedIps: ["10.0.0.1"],
+                        accessMask: 0b1000,
                         nodejsFunctionProps: {
                             runtime: Runtime.NODEJS_18_X
                         },
@@ -58,6 +60,8 @@ describe("Testing the behaviour of the Typescript API construct for CDK", () => 
                         }
                     },
                     cruel: {
+                        authorizedIps: ["10.0.0.1"],
+                        accessMask: 0b1000,
                         world: {
                             nodejsFunctionProps: {
                                 runtime: Runtime.NODEJS_16_X,
@@ -85,7 +89,13 @@ describe("Testing the behaviour of the Typescript API construct for CDK", () => 
         );
         template.hasResourceProperties("AWS::Lambda::Function",
             Match.objectLike({
-                "Description": "Test Typescript API - /noMeow (test)"
+                "Description": "Test Typescript API - /noMeow (test)",
+                "Environment": {
+                    "Variables": {
+                        "ACCESS_MASK": "8",
+                        "IP_LIST": `["10.0.0.1"]`
+                    }
+                }
             })
         );
         template.hasResourceProperties("AWS::Lambda::Function",
@@ -95,7 +105,13 @@ describe("Testing the behaviour of the Typescript API construct for CDK", () => 
         );
         template.hasResourceProperties("AWS::Lambda::Function",
             Match.objectLike({
-                "Description": "Test Typescript API - /cruel/world (test)"
+                "Description": "Test Typescript API - /cruel/world (test)",
+                "Environment": {
+                    "Variables": {
+                        "ACCESS_MASK": "8",
+                        "IP_LIST": `["10.0.0.1"]`
+                    }
+                }
             })
         );
     });

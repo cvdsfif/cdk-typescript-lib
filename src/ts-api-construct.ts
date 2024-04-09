@@ -29,6 +29,20 @@ export interface ExtendedStackProps extends StackProps {
 }
 
 /**
+ * Special properties defining how the tree node and its child nodes can be accessed
+ */
+export type AccessProperties = {
+    /**
+     * Optional list of IP addresses from where it is permitted to access the elements of the subree
+     */
+    authorizedIps?: string[] & { 0: string }
+    /**
+     * Optional bitmask that the client's authorization must match to allow the access to the elements of the subtree
+     */
+    accessMask?: number
+}
+
+/**
  * Properties of the lambda function created on the stack
  */
 export type LambdaProperties = {
@@ -78,7 +92,7 @@ export type LambdaProperties = {
          */
         eventBody?: string
     }]
-}
+} & AccessProperties
 
 /**
  * Tree allowing to assign a specific set of properties to every lambda present on the API. Matches the structure of the API for the construct, each field corresponding to the function name  contains an instance of `LambdaProperties`
@@ -88,7 +102,7 @@ export type LambdaPropertiesTree<T extends ApiDefinition> = {
     T[K] extends ApiDefinition ?
     LambdaPropertiesTree<T[K]> :
     LambdaProperties
-}
+} & AccessProperties
 
 /**
  * Properties defining how the stack is constructed from the `typizator` API definition
@@ -242,11 +256,9 @@ export type TSApiDatabaseProperties<T extends ApiDefinition> = TSApiProperties<T
 export const customDomainLookupMock = <T extends ApiDefinition>(
     scope: Construct,
     _: TSApiPlainProperties<T> | TSApiDatabaseProperties<T>,
-    _1: string) => {
-    return HostedZone
+    _1: string) => HostedZone
         .fromHostedZoneAttributes(scope, "R53Domain",
             { hostedZoneId: "ID", zoneName: "test.com" })
-}
 
 const camelToKebab = (src: string | String) => src.replace(/[A-Z]/g, match => `-${match.toLowerCase()}`)
 const kebabToCamel = (src: string | String) => src.replace(/(?:_|-| |\b)(\w)/g, (_, p1) => p1.toUpperCase())
@@ -425,7 +437,9 @@ const createLambda = <R extends ApiDefinition>(
         ...specificLambdaProperties?.nodejsFunctionProps,
         environment: {
             ...props.lambdaProps?.environment,
-            ...specificLambdaProperties?.nodejsFunctionProps?.environment
+            ...specificLambdaProperties?.nodejsFunctionProps?.environment,
+            IP_LIST: specificLambdaProperties?.authorizedIps ? JSON.stringify(specificLambdaProperties?.authorizedIps) : undefined,
+            ACCESS_MASK: specificLambdaProperties?.accessMask ? JSON.stringify(specificLambdaProperties?.accessMask) : undefined
         }
     } as NodejsFunctionProps;
     if (props.connectDatabase)
@@ -474,7 +488,7 @@ const connectLambda =
         databaseSG?: ISecurityGroup,
         lambdaSG?: ISecurityGroup
     ) => {
-        const filePath = `${props.lambdaPath}${subPath}/${keyKebabCase}`;
+        const filePath = `${props.lambdaPath}${subPath}/${keyKebabCase}`
         const lambda = createLambda(
             scope,
             props,
@@ -499,6 +513,17 @@ const connectLambda =
         return lambda;
     }
 
+const fillLocalAccessProperties = (
+    lambdaPropertiesTree?: AccessProperties,
+    accessProperties?: AccessProperties
+) => {
+    const localAccessProperties = {
+        ...accessProperties,
+    } satisfies AccessProperties
+    if (lambdaPropertiesTree?.accessMask) localAccessProperties.accessMask = lambdaPropertiesTree.accessMask
+    if (lambdaPropertiesTree?.authorizedIps) localAccessProperties.authorizedIps = lambdaPropertiesTree.authorizedIps
+    return localAccessProperties
+}
 
 const createLambdasForApi =
     <R extends ApiDefinition>(
@@ -518,7 +543,8 @@ const createLambdasForApi =
         for (const key of Object.keys(apiMetadata.implementation)) {
             const data = (apiMetadata.implementation as any)[key].metadata
             if (props.apiExclusions?.includes((data as NamedMetadata).path)) continue
-            const keyKebabCase = camelToKebab(key as string);
+            const keyKebabCase = camelToKebab(key as string)
+            const localAccessProperties = fillLocalAccessProperties(lambdaPropertiesTree, (lambdaPropertiesTree as any)?.[key])
             if (data.dataType === "api")
                 (lambdas as any)[key] = createLambdasForApi(
                     scope,
@@ -527,10 +553,13 @@ const createLambdasForApi =
                     data,
                     httpApi,
                     sharedLayer,
-                    (lambdaPropertiesTree as any)?.[key],
+                    {
+                        ...(lambdaPropertiesTree as any)?.[key],
+                        ...localAccessProperties
+                    },
                     vpc,
                     database, databaseSG, lambdaSG
-                );
+                )
             else
                 (lambdas as any)[key] = connectLambda(
                     scope,
@@ -540,12 +569,15 @@ const createLambdasForApi =
                     sharedLayer,
                     key as string,
                     keyKebabCase,
-                    (lambdaPropertiesTree as any)?.[key],
+                    {
+                        ...(lambdaPropertiesTree as any)?.[key],
+                        ...localAccessProperties
+                    },
                     vpc,
                     database, databaseSG, lambdaSG
-                );
+                )
         }
-        return lambdas;
+        return lambdas
     }
 
 /**

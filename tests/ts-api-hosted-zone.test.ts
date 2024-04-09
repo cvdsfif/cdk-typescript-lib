@@ -4,7 +4,6 @@ import { ApiDefinition } from "typizator";
 import { ExtendedStackProps, TSApiConstruct, TSApiDatabaseProperties, TSApiPlainProperties, customDomainLookupMock } from "../src/ts-api-construct";
 import { Template } from "aws-cdk-lib/assertions";
 import { simpleApiS } from "./lambda/shared/simple-api-definition";
-import { HostedZone } from "aws-cdk-lib/aws-route53";
 
 describe("Testing API that is hosted on a separate zone", () => {
     class TestStack<T extends ApiDefinition> extends Stack {
@@ -40,7 +39,7 @@ describe("Testing API that is hosted on a separate zone", () => {
         )).toThrow()
     })
 
-    test("Should fail on trying to retrieve the existing domain resource that does not exist at the test time", () => {
+    test("Should successfully connect the API to a hosted domain", () => {
         const app = new App();
         const props = { deployFor: "test" };
         const stack = new TestStack(
