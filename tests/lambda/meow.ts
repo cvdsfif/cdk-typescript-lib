@@ -1,8 +1,8 @@
-import { handlerImpl } from "typizator-handler";
+import { lambdaConnector } from "typizator-handler";
 import { simpleApiS } from "./shared/simple-api-definition";
 
 export const meowImpl = async () => "Miaou";
-export const meow = handlerImpl(
+export const meow = lambdaConnector(
     simpleApiS.metadata.implementation.meow,
     meowImpl
 );

@@ -33,10 +33,22 @@ describe("Testing the behaviour of the Typescript API construct for CDK", () => 
                 apiMetadata: simpleApiS.metadata,
                 lambdaPath: "tests/lambda",
                 connectDatabase: false,
+                firebaseAdminConnect: {
+                    secretArn: "arn",
+                    internalDatabaseName: "db"
+                },
                 lambdaProps: {
                     environment: {
                         ENV1: "a"
                     }
+                },
+                extraBundling: {
+                    minify: true,
+                    sourceMap: false,
+                    externalModules: [
+                        "json-bigint", "typizator", "typizator-handler", "@aws-sdk/client-secrets-manager", "pg", "crypto",
+                        "aws-cdk-lib", "constructs", "cdk-typescript-lib", "ulid", "moment", "firebase-admin", "luxon"
+                    ]
                 },
                 lambdaPropertiesTree: {
                     meow: {
@@ -93,7 +105,9 @@ describe("Testing the behaviour of the Typescript API construct for CDK", () => 
                 "Environment": {
                     "Variables": {
                         "ACCESS_MASK": "8",
-                        "IP_LIST": `["10.0.0.1"]`
+                        "IP_LIST": `["10.0.0.1"]`,
+                        "FB_SECRET_ARN": "arn",
+                        "FB_DATABASE_NAME": "db"
                     }
                 }
             })
@@ -195,7 +209,15 @@ describe("Testing the behaviour of the Typescript API construct for CDK", () => 
                 logGroupProps: {
                     removalPolicy: RemovalPolicy.RETAIN
                 },
-                connectDatabase: false
+                connectDatabase: false,
+                extraBundling: {
+                    minify: true,
+                    sourceMap: false,
+                    externalModules: [
+                        "json-bigint", "typizator", "typizator-handler", "@aws-sdk/client-secrets-manager", "pg", "crypto",
+                        "aws-cdk-lib", "constructs", "cdk-typescript-lib", "ulid", "moment", "firebase-admin", "luxon"
+                    ]
+                }
             }
         );
         template = Template.fromStack(stack);

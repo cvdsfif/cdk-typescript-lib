@@ -49,6 +49,14 @@ describe("Testing a stack with connected database", () => {
                         }
                     }
                 },
+                extraBundling: {
+                    minify: true,
+                    sourceMap: false,
+                    externalModules: [
+                        "json-bigint", "typizator", "typizator-handler", "@aws-sdk/client-secrets-manager", "pg", "crypto",
+                        "aws-cdk-lib", "constructs", "cdk-typescript-lib", "ulid", "moment", "firebase-admin", "luxon"
+                    ]
+                },
                 dbProps: {
                     databaseName: "TestDatabase",
                     maxAllocatedStorage: 120
@@ -95,6 +103,14 @@ describe("Testing a stack with connected database", () => {
                 migrationLambda: "migration",
                 dbProps: {
                     databaseName: "TestDatabase"
+                },
+                extraBundling: {
+                    minify: true,
+                    sourceMap: false,
+                    externalModules: [
+                        "json-bigint", "typizator", "typizator-handler", "@aws-sdk/client-secrets-manager", "pg", "crypto",
+                        "aws-cdk-lib", "constructs", "cdk-typescript-lib", "ulid", "moment", "firebase-admin", "luxon"
+                    ]
                 }
             }
         );
@@ -120,6 +136,14 @@ describe("Testing a stack with connected database", () => {
                 migrationLambda: "migration",
                 dbProps: {
                     databaseName: "TestDatabase"
+                },
+                extraBundling: {
+                    minify: true,
+                    sourceMap: false,
+                    externalModules: [
+                        "json-bigint", "typizator", "typizator-handler", "@aws-sdk/client-secrets-manager", "pg", "crypto",
+                        "aws-cdk-lib", "constructs", "cdk-typescript-lib", "ulid", "moment", "firebase-admin", "luxon"
+                    ]
                 }
             }
         );
@@ -139,6 +163,14 @@ describe("Testing a stack with connected database", () => {
                 migrationLambdaPath: "/cruel",
                 dbProps: {
                     databaseName: "TestDatabase"
+                },
+                extraBundling: {
+                    minify: true,
+                    sourceMap: false,
+                    externalModules: [
+                        "json-bigint", "typizator", "typizator-handler", "@aws-sdk/client-secrets-manager", "pg", "crypto",
+                        "aws-cdk-lib", "constructs", "cdk-typescript-lib", "ulid", "moment", "firebase-admin", "luxon"
+                    ]
                 }
             }
         );
@@ -168,6 +200,14 @@ describe("Testing a stack with connected database", () => {
                     migrationLambda: "notFound",
                     dbProps: {
                         databaseName: "TestDatabase"
+                    },
+                    extraBundling: {
+                        minify: true,
+                        sourceMap: false,
+                        externalModules: [
+                            "json-bigint", "typizator", "typizator-handler", "@aws-sdk/client-secrets-manager", "pg", "crypto",
+                            "aws-cdk-lib", "constructs", "cdk-typescript-lib", "ulid", "moment", "firebase-admin", "luxon"
+                        ]
                     }
                 }
             )
@@ -190,6 +230,14 @@ describe("Testing a stack with connected database", () => {
                     migrationLambda: "wrong",
                     dbProps: {
                         databaseName: "TestDatabase"
+                    },
+                    extraBundling: {
+                        minify: true,
+                        sourceMap: false,
+                        externalModules: [
+                            "json-bigint", "typizator", "typizator-handler", "@aws-sdk/client-secrets-manager", "pg", "crypto",
+                            "aws-cdk-lib", "constructs", "cdk-typescript-lib", "ulid", "moment", "firebase-admin", "luxon"
+                        ]
                     }
                 }
             )
@@ -212,6 +260,14 @@ describe("Testing a stack with connected database", () => {
                     migrationLambda: "meow",
                     dbProps: {
                         databaseName: "TestDatabase"
+                    },
+                    extraBundling: {
+                        minify: true,
+                        sourceMap: false,
+                        externalModules: [
+                            "json-bigint", "typizator", "typizator-handler", "@aws-sdk/client-secrets-manager", "pg", "crypto",
+                            "aws-cdk-lib", "constructs", "cdk-typescript-lib", "ulid", "moment", "firebase-admin", "luxon"
+                        ]
                     }
                 }
             )
@@ -235,6 +291,14 @@ describe("Testing a stack with connected database", () => {
                 },
                 bastion: {
                     openTo: ["8.8.8.8/32"]
+                },
+                extraBundling: {
+                    minify: true,
+                    sourceMap: false,
+                    externalModules: [
+                        "json-bigint", "typizator", "typizator-handler", "@aws-sdk/client-secrets-manager", "pg", "crypto",
+                        "aws-cdk-lib", "constructs", "cdk-typescript-lib", "ulid", "moment", "firebase-admin", "luxon"
+                    ]
                 }
             }
         );

@@ -186,8 +186,22 @@ export type TSApiProperties<T extends ApiDefinition> = {
          */
         customDomainLookup?: (
             scope: Construct,
-            props: TSApiPlainProperties<T> | TSApiDatabaseProperties<T>,
+            props: TsApiGenericProperties<T>,
             customPath: string) => IHostedZone
+    },
+    /**
+     * If defined, allows the Firebase admin interface connection (used essentially to send notification to mobile devices)
+     * by setting the appropriate environment variables that are then used in the `lambdaConnector` to give the API access to that resource
+     */
+    firebaseAdminConnect?: {
+        /**
+         * Secret ARN where you can (manually) put the access key for Firebase admin
+         */
+        secretArn: string,
+        /**
+         * Internal Firebase database name. It is provided to you by your Firebase management interface
+         */
+        internalDatabaseName: string
     }
 }
 
@@ -247,6 +261,12 @@ export type TSApiDatabaseProperties<T extends ApiDefinition> = TSApiProperties<T
 }
 
 /**
+ * All the possible combinations of TsApi properties
+ */
+export type TsApiGenericProperties<T extends ApiDefinition> =
+    TSApiPlainProperties<T> | TSApiDatabaseProperties<T>
+
+/**
  * Creates a test mock of the hosted zone lookup
  * @param scope CDK construct scope. `this` from the stack for example
  * @param _ Not used in the mock implementation 
@@ -255,7 +275,7 @@ export type TSApiDatabaseProperties<T extends ApiDefinition> = TSApiProperties<T
  */
 export const customDomainLookupMock = <T extends ApiDefinition>(
     scope: Construct,
-    _: TSApiPlainProperties<T> | TSApiDatabaseProperties<T>,
+    _: TsApiGenericProperties<T>,
     _1: string) => HostedZone
         .fromHostedZoneAttributes(scope, "R53Domain",
             { hostedZoneId: "ID", zoneName: "test.com" })
@@ -292,7 +312,7 @@ export const DEFAULT_RUNTIME = Runtime.NODEJS_20_X;
 
 const lookupHostedZone = <T extends ApiDefinition>(
     scope: Construct,
-    props: TSApiPlainProperties<T> | TSApiDatabaseProperties<T>,
+    props: TsApiGenericProperties<T>,
     customPath: string) =>
     HostedZone.fromLookup(scope, `parent-zone-${props.apiName}-${customPath}${props.deployFor}`, {
         domainName: props.apiDomainData!.hostedZoneName
@@ -301,7 +321,7 @@ const lookupHostedZone = <T extends ApiDefinition>(
 
 const createHttpApi = <T extends ApiDefinition>(
     scope: Construct,
-    props: TSApiPlainProperties<T> | TSApiDatabaseProperties<T> | InnerDependentApiProperties<T>,
+    props: TsApiGenericProperties<T> | InnerDependentApiProperties<T>,
     customPath = ""
 ) => {
     if (!props.apiDomainData) {
@@ -391,7 +411,7 @@ const connectLambdaToDatabase =
 
 const createLambda = <R extends ApiDefinition>(
     scope: Construct,
-    props: TSApiPlainProperties<R> | TSApiDatabaseProperties<R> | InnerDependentApiProperties<R>,
+    props: TsApiGenericProperties<R> | InnerDependentApiProperties<R>,
     subPath: string,
     sharedLayer: LayerVersion,
     key: string,
@@ -439,7 +459,9 @@ const createLambda = <R extends ApiDefinition>(
             ...props.lambdaProps?.environment,
             ...specificLambdaProperties?.nodejsFunctionProps?.environment,
             IP_LIST: specificLambdaProperties?.authorizedIps ? JSON.stringify(specificLambdaProperties?.authorizedIps) : undefined,
-            ACCESS_MASK: specificLambdaProperties?.accessMask ? JSON.stringify(specificLambdaProperties?.accessMask) : undefined
+            ACCESS_MASK: specificLambdaProperties?.accessMask ? JSON.stringify(specificLambdaProperties?.accessMask) : undefined,
+            FB_SECRET_ARN: props.firebaseAdminConnect?.secretArn,
+            FB_DATABASE_NAME: props.firebaseAdminConnect?.internalDatabaseName
         }
     } as NodejsFunctionProps;
     if (props.connectDatabase)
@@ -476,7 +498,7 @@ const createLambda = <R extends ApiDefinition>(
 const connectLambda =
     <R extends ApiDefinition>(
         scope: Construct,
-        props: TSApiPlainProperties<R> | TSApiDatabaseProperties<R> | InnerDependentApiProperties<R>,
+        props: TsApiGenericProperties<R> | InnerDependentApiProperties<R>,
         subPath: string,
         httpApi: HttpApi,
         sharedLayer: LayerVersion,
@@ -528,7 +550,7 @@ const fillLocalAccessProperties = (
 const createLambdasForApi =
     <R extends ApiDefinition>(
         scope: Construct,
-        props: TSApiPlainProperties<R> | TSApiDatabaseProperties<R> | InnerDependentApiProperties<R>,
+        props: TsApiGenericProperties<R> | InnerDependentApiProperties<R>,
         subPath: string,
         apiMetadata: ApiMetadata<R>,
         httpApi: HttpApi,
@@ -771,7 +793,7 @@ export class TSApiConstruct<T extends ApiDefinition> extends Construct {
      * @param id ID of the construct, has to be unique for your AWS account
      * @param props Properties, as defining in the corresponding types
      */
-    constructor(scope: Construct, id: string, props: TSApiPlainProperties<T> | TSApiDatabaseProperties<T>) {
+    constructor(scope: Construct, id: string, props: TsApiGenericProperties<T>) {
         super(scope, id)
 
         const apiInfo = createHttpApi(this, props)

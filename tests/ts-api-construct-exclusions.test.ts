@@ -47,6 +47,14 @@ describe("Testing partial exclusions on the API", () => {
                 apiMetadata: simpleApiS.metadata,
                 lambdaPath: "tests/lambda",
                 connectDatabase: true,
+                extraBundling: {
+                    minify: true,
+                    sourceMap: false,
+                    externalModules: [
+                        "json-bigint", "typizator", "typizator-handler", "@aws-sdk/client-secrets-manager", "pg", "crypto",
+                        "aws-cdk-lib", "constructs", "cdk-typescript-lib", "ulid", "moment", "firebase-admin", "luxon"
+                    ]
+                },
                 dbProps: {
                     databaseName: "TestDB"
                 },

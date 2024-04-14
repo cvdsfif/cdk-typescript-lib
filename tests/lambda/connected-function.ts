@@ -1,8 +1,9 @@
-import { HandlerProps, connectedHandlerImpl } from "typizator-handler";
+import { HandlerProps, lambdaConnector } from "typizator-handler";
 import { connectedApi } from "./shared/connected-api-definition";
 
-export const connectedFunction = connectedHandlerImpl(
+export const connectedFunction = lambdaConnector(
     connectedApi.metadata.implementation.connectedFunction,
-    async (props: HandlerProps) => { }
+    async (props: HandlerProps) => { },
+    { databaseConnected: true }
 );
 

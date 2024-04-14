@@ -35,7 +35,15 @@ describe("Testing the cases when the constructs creation should fail", () => {
                     notFound: { args: [] }
                 }).metadata,
                 lambdaPath: "tests/lambda",
-                connectDatabase: false
+                connectDatabase: false,
+                extraBundling: {
+                    minify: true,
+                    sourceMap: false,
+                    externalModules: [
+                        "json-bigint", "typizator", "typizator-handler", "@aws-sdk/client-secrets-manager", "pg", "crypto",
+                        "aws-cdk-lib", "constructs", "cdk-typescript-lib", "ulid", "moment", "firebase-admin", "luxon"
+                    ]
+                }
             }
         )).toThrow("Handler not found, searching up to ../../../../../../../../../tests/lambda/not-found");
     })
@@ -51,7 +59,15 @@ describe("Testing the cases when the constructs creation should fail", () => {
                 description: "Test Typescript API",
                 apiMetadata: wrongApiS.metadata,
                 lambdaPath: "tests/lambda",
-                connectDatabase: false
+                connectDatabase: false,
+                extraBundling: {
+                    minify: true,
+                    sourceMap: false,
+                    externalModules: [
+                        "json-bigint", "typizator", "typizator-handler", "@aws-sdk/client-secrets-manager", "pg", "crypto",
+                        "aws-cdk-lib", "constructs", "cdk-typescript-lib", "ulid", "moment", "firebase-admin", "luxon"
+                    ]
+                }
             }
         )).toThrow("No appropriate handler connected for tests/lambda/wrong");
     });
@@ -67,7 +83,15 @@ describe("Testing the cases when the constructs creation should fail", () => {
                 description: "Test Typescript API",
                 apiMetadata: connectedApi.metadata,
                 lambdaPath: "tests/lambda",
-                connectDatabase: false
+                connectDatabase: false,
+                extraBundling: {
+                    minify: true,
+                    sourceMap: false,
+                    externalModules: [
+                        "json-bigint", "typizator", "typizator-handler", "@aws-sdk/client-secrets-manager", "pg", "crypto",
+                        "aws-cdk-lib", "constructs", "cdk-typescript-lib", "ulid", "moment", "firebase-admin", "luxon"
+                    ]
+                }
             }
         )).toThrow("Trying to connect database to a lambda on a non-connected stack in tests/lambda/connected-function");
     });
@@ -83,7 +107,15 @@ describe("Testing the cases when the constructs creation should fail", () => {
                 description: "Test Typescript API",
                 apiMetadata: apiS({ notImplemented: { args: [] } }).metadata,
                 lambdaPath: "tests/lambda",
-                connectDatabase: false
+                connectDatabase: false,
+                extraBundling: {
+                    minify: true,
+                    sourceMap: false,
+                    externalModules: [
+                        "json-bigint", "typizator", "typizator-handler", "@aws-sdk/client-secrets-manager", "pg", "crypto",
+                        "aws-cdk-lib", "constructs", "cdk-typescript-lib", "ulid", "moment", "firebase-admin", "luxon"
+                    ]
+                }
             }
         )).toThrow("No appropriate handler connected for tests/lambda/not-implemented");
     });

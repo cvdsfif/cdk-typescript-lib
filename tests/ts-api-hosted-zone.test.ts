@@ -34,6 +34,14 @@ describe("Testing API that is hosted on a separate zone", () => {
                 apiDomainData: {
                     hostedZoneName: "example.com",
                     domainNamePrefix: "test"
+                },
+                extraBundling: {
+                    minify: true,
+                    sourceMap: false,
+                    externalModules: [
+                        "json-bigint", "typizator", "typizator-handler", "@aws-sdk/client-secrets-manager", "pg", "crypto",
+                        "aws-cdk-lib", "constructs", "cdk-typescript-lib", "ulid", "moment", "firebase-admin", "luxon"
+                    ]
                 }
             }
         )).toThrow()
@@ -55,6 +63,14 @@ describe("Testing API that is hosted on a separate zone", () => {
                     hostedZoneName: "example.com",
                     domainNamePrefix: "test",
                     customDomainLookup: customDomainLookupMock
+                },
+                extraBundling: {
+                    minify: true,
+                    sourceMap: false,
+                    externalModules: [
+                        "json-bigint", "typizator", "typizator-handler", "@aws-sdk/client-secrets-manager", "pg", "crypto",
+                        "aws-cdk-lib", "constructs", "cdk-typescript-lib", "ulid", "moment", "firebase-admin", "luxon"
+                    ]
                 }
             }
         )
