@@ -1,10 +1,11 @@
 import { App, RemovalPolicy, Stack } from "aws-cdk-lib";
 import { Match, Template } from "aws-cdk-lib/assertions";
 import { Construct } from "constructs";
-import { simpleApiS } from "./lambda/shared/simple-api-definition";
+import { simpleApiS, simpleApiWithFirebaseS } from "./lambda/shared/simple-api-definition";
 import { ApiDefinition } from "typizator";
 import { ExtendedStackProps, TSApiConstruct, TSApiPlainProperties } from "../src/ts-api-construct";
 import { Architecture, Runtime } from "aws-cdk-lib/aws-lambda";
+import { Secret } from "aws-cdk-lib/aws-secretsmanager";
 
 describe("Testing the behaviour of the Typescript API construct for CDK", () => {
     class TestStack<T extends ApiDefinition> extends Stack {
@@ -12,10 +13,10 @@ describe("Testing the behaviour of the Typescript API construct for CDK", () => 
             scope: Construct,
             id: string,
             props: ExtendedStackProps,
-            apiProps: TSApiPlainProperties<T>,
+            createConstruct: (stack: Stack) => TSApiConstruct<T>
         ) {
-            super(scope, id, props);
-            new TSApiConstruct(this, "SimpleApi", apiProps);
+            super(scope, id, props)
+            createConstruct(this)
         }
     }
 
@@ -23,67 +24,70 @@ describe("Testing the behaviour of the Typescript API construct for CDK", () => 
 
     beforeEach(() => {
         const app = new App();
-        const props = { deployFor: "test" };
+        const props = { deployFor: "test" }
         const stack = new TestStack(
             app, "TestedStack", props,
-            {
-                ...props,
-                apiName: "TSTestApi",
-                description: "Test Typescript API",
-                apiMetadata: simpleApiS.metadata,
-                lambdaPath: "tests/lambda",
-                connectDatabase: false,
-                firebaseAdminConnect: {
-                    secretArn: "arn",
-                    internalDatabaseName: "db"
-                },
-                lambdaProps: {
-                    environment: {
-                        ENV1: "a"
-                    }
-                },
-                extraBundling: {
-                    minify: true,
-                    sourceMap: false,
-                    externalModules: [
-                        "json-bigint", "typizator", "typizator-handler", "@aws-sdk/client-secrets-manager", "pg", "crypto",
-                        "aws-cdk-lib", "constructs", "cdk-typescript-lib", "ulid", "moment", "firebase-admin", "luxon"
-                    ]
-                },
-                lambdaPropertiesTree: {
-                    meow: {
-                        schedules: [{
-                            cron: { minute: "0/1" }
-                        }],
-                        nodejsFunctionProps: {
-                            environment: {
-                                ENV2: "b"
-                            }
+            (stack: Stack) => {
+                const secret = new Secret(stack, "TestSecret")
+                return new TSApiConstruct(stack, "SimpleApi", {
+                    ...props,
+                    apiName: "TSTestApi",
+                    description: "Test Typescript API",
+                    apiMetadata: simpleApiWithFirebaseS.metadata,
+                    lambdaPath: "tests/lambda",
+                    connectDatabase: false,
+                    firebaseAdminConnect: {
+                        secret,
+                        internalDatabaseName: "db"
+                    },
+                    lambdaProps: {
+                        environment: {
+                            ENV1: "a"
                         }
                     },
-                    noMeow: {
-                        authorizedIps: ["10.0.0.1"],
-                        accessMask: 0b1000,
-                        nodejsFunctionProps: {
-                            runtime: Runtime.NODEJS_18_X
-                        },
-                        logGroupProps: {
-                            removalPolicy: RemovalPolicy.SNAPSHOT
-                        }
+                    extraBundling: {
+                        minify: true,
+                        sourceMap: false,
+                        externalModules: [
+                            "json-bigint", "typizator", "typizator-handler", "@aws-sdk/client-secrets-manager", "pg", "crypto",
+                            "aws-cdk-lib", "constructs", "cdk-typescript-lib", "ulid", "moment", "firebase-admin", "luxon"
+                        ]
                     },
-                    cruel: {
-                        authorizedIps: ["10.0.0.1"],
-                        accessMask: 0b1000,
-                        world: {
+                    lambdaPropertiesTree: {
+                        meow: {
+                            schedules: [{
+                                cron: { minute: "0/1" }
+                            }],
                             nodejsFunctionProps: {
-                                runtime: Runtime.NODEJS_16_X,
-                                architecture: Architecture.X86_64
+                                environment: {
+                                    ENV2: "b"
+                                }
+                            }
+                        },
+                        noMeow: {
+                            authorizedIps: ["10.0.0.1"],
+                            accessMask: 0b1000,
+                            nodejsFunctionProps: {
+                                runtime: Runtime.NODEJS_18_X
+                            },
+                            logGroupProps: {
+                                removalPolicy: RemovalPolicy.SNAPSHOT
+                            }
+                        },
+                        cruel: {
+                            authorizedIps: ["10.0.0.1"],
+                            accessMask: 0b1000,
+                            world: {
+                                nodejsFunctionProps: {
+                                    runtime: Runtime.NODEJS_16_X,
+                                    architecture: Architecture.X86_64
+                                }
                             }
                         }
                     }
-                }
+                })
             }
-        );
+        )
         template = Template.fromStack(stack);
     });
 
@@ -105,13 +109,24 @@ describe("Testing the behaviour of the Typescript API construct for CDK", () => 
                 "Environment": {
                     "Variables": {
                         "ACCESS_MASK": "8",
-                        "IP_LIST": `["10.0.0.1"]`,
-                        "FB_SECRET_ARN": "arn",
+                        "IP_LIST": `["10.0.0.1"]`
+                    }
+                }
+            })
+        )
+        template.hasResourceProperties("AWS::Lambda::Function",
+            Match.objectLike({
+                "Description": "Test Typescript API - /firebaseConnected (test)",
+                "Environment": {
+                    "Variables": {
+                        "FB_SECRET_ARN": {
+                            "Ref": Match.stringLikeRegexp("TestSecret")
+                        },
                         "FB_DATABASE_NAME": "db"
                     }
                 }
             })
-        );
+        )
         template.hasResourceProperties("AWS::Lambda::Function",
             Match.objectLike({
                 "Description": "Test Typescript API - /helloWorld (test)"
@@ -196,30 +211,32 @@ describe("Testing the behaviour of the Typescript API construct for CDK", () => 
         const props = { deployFor: "staging" };
         const stack = new TestStack(
             app, "TestedStack", props,
-            {
-                ...props,
-                apiName: "TSTestApi",
-                description: "Test Typescript API",
-                apiMetadata: simpleApiS.metadata,
-                lambdaPath: "tests/lambda",
-                lambdaProps: {
-                    runtime: Runtime.NODEJS_18_X,
-                    architecture: Architecture.ARM_64
-                },
-                logGroupProps: {
-                    removalPolicy: RemovalPolicy.RETAIN
-                },
-                connectDatabase: false,
-                extraBundling: {
-                    minify: true,
-                    sourceMap: false,
-                    externalModules: [
-                        "json-bigint", "typizator", "typizator-handler", "@aws-sdk/client-secrets-manager", "pg", "crypto",
-                        "aws-cdk-lib", "constructs", "cdk-typescript-lib", "ulid", "moment", "firebase-admin", "luxon"
-                    ]
+            (stack: Stack) => new TSApiConstruct(stack, "SimpleApi",
+                {
+                    ...props,
+                    apiName: "TSTestApi",
+                    description: "Test Typescript API",
+                    apiMetadata: simpleApiS.metadata,
+                    lambdaPath: "tests/lambda",
+                    lambdaProps: {
+                        runtime: Runtime.NODEJS_18_X,
+                        architecture: Architecture.ARM_64
+                    },
+                    logGroupProps: {
+                        removalPolicy: RemovalPolicy.RETAIN
+                    },
+                    connectDatabase: false,
+                    extraBundling: {
+                        minify: true,
+                        sourceMap: false,
+                        externalModules: [
+                            "json-bigint", "typizator", "typizator-handler", "@aws-sdk/client-secrets-manager", "pg", "crypto",
+                            "aws-cdk-lib", "constructs", "cdk-typescript-lib", "ulid", "moment", "firebase-admin", "luxon"
+                        ]
+                    }
                 }
-            }
-        );
+            )
+        )
         template = Template.fromStack(stack);
         template.hasResourceProperties("AWS::Lambda::Function",
             Match.objectLike({

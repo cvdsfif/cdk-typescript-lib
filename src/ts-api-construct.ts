@@ -16,6 +16,7 @@ import { LambdaFunction } from "aws-cdk-lib/aws-events-targets";
 import { ARecord, HostedZone, IHostedZone, RecordTarget } from "aws-cdk-lib/aws-route53";
 import { Certificate, CertificateValidation } from "aws-cdk-lib/aws-certificatemanager";
 import { ApiGatewayv2DomainProperties } from "aws-cdk-lib/aws-route53-targets";
+import { Secret } from "aws-cdk-lib/aws-secretsmanager";
 
 /**
  * Extended properties for the stack creation.
@@ -195,9 +196,9 @@ export type TSApiProperties<T extends ApiDefinition> = {
      */
     firebaseAdminConnect?: {
         /**
-         * Secret ARN where you can (manually) put the access key for Firebase admin
+         * Construct describing the secret to make accessible to lambdas if they need it
          */
-        secretArn: string,
+        secret: Secret,
         /**
          * Internal Firebase database name. It is provided to you by your Firebase management interface
          */
@@ -422,11 +423,15 @@ const createLambda = <R extends ApiDefinition>(
     databaseSG?: ISecurityGroup,
     lambdaSG?: ISecurityGroup
 ) => {
-    const handler = requireHereAndUp(`${filePath}`)[key];
-    const resourcesConnected = handler?.connectedResources;
-    if (!resourcesConnected) throw new Error(`No appropriate handler connected for ${filePath}`);
+    const handler = requireHereAndUp(`${filePath}`)[key]
+    const resourcesConnected = handler?.connectedResources
+    if (!resourcesConnected) throw new Error(`No appropriate handler connected for ${filePath}`)
     if (!props.connectDatabase && Array.from(resourcesConnected).includes(ConnectedResources.DATABASE.toString()))
-        throw new Error(`Trying to connect database to a lambda on a non-connected stack in ${filePath}`);
+        throw new Error(`Trying to connect database to a lambda on a non-connected stack in ${filePath}`)
+
+    const connectFirebase = Array.from(resourcesConnected).includes(ConnectedResources.FIREBASE_ADMIN.toString())
+    if (!props.firebaseAdminConnect && connectFirebase)
+        throw new Error(`Trying to connect firebase admin to a lambda on a non-connected stack in ${filePath}`)
 
     const camelCasePath = kebabToCamel(filePath.replace("/", "-"))
 
@@ -460,23 +465,26 @@ const createLambda = <R extends ApiDefinition>(
             ...specificLambdaProperties?.nodejsFunctionProps?.environment,
             IP_LIST: specificLambdaProperties?.authorizedIps ? JSON.stringify(specificLambdaProperties?.authorizedIps) : undefined,
             ACCESS_MASK: specificLambdaProperties?.accessMask ? JSON.stringify(specificLambdaProperties?.accessMask) : undefined,
-            FB_SECRET_ARN: props.firebaseAdminConnect?.secretArn,
-            FB_DATABASE_NAME: props.firebaseAdminConnect?.internalDatabaseName
+            FB_SECRET_ARN: connectFirebase ? props.firebaseAdminConnect?.secret.secretArn : undefined,
+            FB_DATABASE_NAME: connectFirebase ? props.firebaseAdminConnect?.internalDatabaseName : undefined
         }
     } as NodejsFunctionProps;
+
     if (props.connectDatabase)
         lambdaProperties = addDatabaseProperties(
             props,
             lambdaProperties,
             vpc!, database!, lambdaSG!,
             specificLambdaProperties?.nodejsFunctionProps
-        );
+        )
 
     const lambda = new NodejsFunction(
         scope,
         `TSApiLambda-${camelCasePath}${props.deployFor}`,
         lambdaProperties
-    );
+    )
+
+    if (connectFirebase) props.firebaseAdminConnect?.secret.grantRead(lambda)
 
     if (props.connectDatabase)
         connectLambdaToDatabase(database!, databaseSG!, lambda, lambdaProperties.securityGroups![0], props, camelCasePath);

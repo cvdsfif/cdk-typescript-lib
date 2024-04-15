@@ -72,7 +72,7 @@ describe("Testing the cases when the constructs creation should fail", () => {
         )).toThrow("No appropriate handler connected for tests/lambda/wrong");
     });
 
-    test("Should break if a handler is found but tries to obtain a non-available resource", () => {
+    test("Should break if a handler is found but tries to obtain a non-available database resource", () => {
         const app = new App();
         const props = { deployFor: "staging" };
         expect(() => new TestStack(
@@ -94,7 +94,33 @@ describe("Testing the cases when the constructs creation should fail", () => {
                 }
             }
         )).toThrow("Trying to connect database to a lambda on a non-connected stack in tests/lambda/connected-function");
-    });
+    })
+
+    test("Should break if a handler is found but tries to obtain a non-available firebase admin resource", () => {
+        const app = new App();
+        const props = { deployFor: "staging" };
+        expect(() => new TestStack(
+            app, "TestedStack", props,
+            {
+                ...props,
+                apiName: "TSTestApi",
+                description: "Test Typescript API",
+                apiMetadata: apiS({
+                    firebaseConnected: { args: [] }
+                }).metadata,
+                lambdaPath: "tests/lambda",
+                connectDatabase: false,
+                extraBundling: {
+                    minify: true,
+                    sourceMap: false,
+                    externalModules: [
+                        "json-bigint", "typizator", "typizator-handler", "@aws-sdk/client-secrets-manager", "pg", "crypto",
+                        "aws-cdk-lib", "constructs", "cdk-typescript-lib", "ulid", "moment", "firebase-admin", "luxon"
+                    ]
+                }
+            }
+        )).toThrow("Trying to connect firebase admin to a lambda on a non-connected stack in tests/lambda/firebase-connected");
+    })
 
     test("Should break if a handler is found but not implemented with a library function", () => {
         const app = new App();
