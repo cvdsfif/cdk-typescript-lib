@@ -5,8 +5,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
+Dictionary schemas integrated
 
 ## 2.0.1 - 2024-04-25
+Firebase admin connection support
 
 ## 2.0.1-beta.1 - 2024-04-23
 
@@ -19,7 +21,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## 2.0.0-beta.1 - 2024-04-15
 
 ## 2.0.0-beta.0 - 2024-04-14
-Firebase admin connection support
 
 ## 1.8.0 - 2024-04-09
 Security system
