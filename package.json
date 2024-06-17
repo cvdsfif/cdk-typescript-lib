@@ -1,6 +1,6 @@
 {
   "name": "cdk-typescript-lib",
-  "version": "2.0.4",
+  "version": "3.0.0-beta.0",
   "description": "Implementing generic typescript API interfaces on CDK",
   "main": "dist/index.cjs.js",
   "module": "dist/index.esm.js",
