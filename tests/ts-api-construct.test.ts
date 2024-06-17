@@ -36,6 +36,7 @@ describe("Testing the behaviour of the Typescript API construct for CDK", () => 
                     apiMetadata: simpleApiWithFirebaseS.metadata,
                     lambdaPath: "tests/lambda",
                     connectDatabase: false,
+                    secrets: { arns: ["test"] },
                     firebaseAdminConnect: {
                         secret,
                         internalDatabaseName: "db"
@@ -123,6 +124,16 @@ describe("Testing the behaviour of the Typescript API construct for CDK", () => 
                             "Ref": Match.stringLikeRegexp("TestSecret")
                         },
                         "FB_DATABASE_NAME": "db"
+                    }
+                }
+            })
+        )
+        template.hasResourceProperties("AWS::Lambda::Function",
+            Match.objectLike({
+                "Description": "Test Typescript API - /secretsConnected (test)",
+                "Environment": {
+                    "Variables": {
+                        "SECRETS_LIST": "test"
                     }
                 }
             })

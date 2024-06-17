@@ -2,7 +2,6 @@ import { App, Stack } from "aws-cdk-lib";
 import { Construct } from "constructs";
 import { ApiDefinition, apiS } from "typizator";
 import { ExtendedStackProps, TSApiConstruct, TSApiDatabaseProperties, TSApiPlainProperties } from "../src/ts-api-construct";
-import { Template } from "aws-cdk-lib/assertions";
 import { connectedApi } from "./lambda/shared/connected-api-definition";
 
 describe("Testing the cases when the constructs creation should fail", () => {
@@ -120,6 +119,32 @@ describe("Testing the cases when the constructs creation should fail", () => {
                 }
             }
         )).toThrow("Trying to connect firebase admin to a lambda on a non-connected stack in tests/lambda/firebase-connected");
+    })
+
+    test("Should break if a handler is found but tries to obtain a non-available secret injection", () => {
+        const app = new App();
+        const props = { deployFor: "staging" };
+        expect(() => new TestStack(
+            app, "TestedStack", props,
+            {
+                ...props,
+                apiName: "TSTestApi",
+                description: "Test Typescript API",
+                apiMetadata: apiS({
+                    secretsConnected: { args: [] }
+                }).metadata,
+                lambdaPath: "tests/lambda",
+                connectDatabase: false,
+                extraBundling: {
+                    minify: true,
+                    sourceMap: false,
+                    externalModules: [
+                        "json-bigint", "typizator", "typizator-handler", "@aws-sdk/client-secrets-manager", "pg", "crypto",
+                        "aws-cdk-lib", "constructs", "cdk-typescript-lib", "ulid", "moment", "firebase-admin", "luxon"
+                    ]
+                }
+            }
+        )).toThrow("Trying to inject secrets on a stack without secrets");
     })
 
     test("Should break if a handler is found but not implemented with a library function", () => {

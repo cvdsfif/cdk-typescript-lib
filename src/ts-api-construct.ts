@@ -203,6 +203,12 @@ export type TSApiProperties<T extends ApiDefinition> = {
          * Internal Firebase database name. It is provided to you by your Firebase management interface
          */
         internalDatabaseName: string
+    },
+    /**
+     * If defined, lists the secrets to inject into the concerned lambdas
+     */
+    secrets?: {
+        arns: string[] & { 0: string }
     }
 }
 
@@ -426,12 +432,17 @@ const createLambda = <R extends ApiDefinition>(
     const handler = requireHereAndUp(`${filePath}`)[key]
     const resourcesConnected = handler?.connectedResources
     if (!resourcesConnected) throw new Error(`No appropriate handler connected for ${filePath}`)
-    if (!props.connectDatabase && Array.from(resourcesConnected).includes(ConnectedResources.DATABASE.toString()))
+    const connectedResourcesArray = Array.from(resourcesConnected)
+    if (!props.connectDatabase && connectedResourcesArray.includes(ConnectedResources.DATABASE.toString()))
         throw new Error(`Trying to connect database to a lambda on a non-connected stack in ${filePath}`)
 
-    const connectFirebase = Array.from(resourcesConnected).includes(ConnectedResources.FIREBASE_ADMIN.toString())
+    const connectFirebase = connectedResourcesArray.includes(ConnectedResources.FIREBASE_ADMIN.toString())
     if (!props.firebaseAdminConnect && connectFirebase)
         throw new Error(`Trying to connect firebase admin to a lambda on a non-connected stack in ${filePath}`)
+
+    const connectedSecrets = connectedResourcesArray.includes(ConnectedResources.SECRETS.toString())
+    if (!props.secrets && connectedSecrets)
+        throw new Error(`Trying to inject secrets on a stack without secrets`);
 
     const camelCasePath = kebabToCamel(filePath.replace("/", "-"))
 
@@ -466,7 +477,8 @@ const createLambda = <R extends ApiDefinition>(
             IP_LIST: specificLambdaProperties?.authorizedIps ? JSON.stringify(specificLambdaProperties?.authorizedIps) : undefined,
             ACCESS_MASK: specificLambdaProperties?.accessMask ? JSON.stringify(specificLambdaProperties?.accessMask) : undefined,
             FB_SECRET_ARN: connectFirebase ? props.firebaseAdminConnect?.secret.secretArn : undefined,
-            FB_DATABASE_NAME: connectFirebase ? props.firebaseAdminConnect?.internalDatabaseName : undefined
+            FB_DATABASE_NAME: connectFirebase ? props.firebaseAdminConnect?.internalDatabaseName : undefined,
+            SECRETS_LIST: connectedSecrets ? props.secrets!.arns.join(",") : undefined,
         }
     } as NodejsFunctionProps;
 
