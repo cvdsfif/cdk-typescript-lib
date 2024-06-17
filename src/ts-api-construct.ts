@@ -209,7 +209,11 @@ export type TSApiProperties<T extends ApiDefinition> = {
      */
     secrets?: {
         arns: string[] & { 0: string }
-    }
+    },
+    /**
+     * If defined, creates a telegraf instance with the bot ID stored in the ARN passed to this field
+     */
+    telegrafArn?: string
 }
 
 /**
@@ -444,6 +448,10 @@ const createLambda = <R extends ApiDefinition>(
     if (!props.secrets && connectedSecrets)
         throw new Error(`Trying to inject secrets on a stack without secrets`);
 
+    const connectedTelegraf = connectedResourcesArray.includes(ConnectedResources.TELEGRAF.toString())
+    if (!props.telegrafArn && connectedTelegraf)
+        throw new Error(`Trying to connect telegraf to a lambda on a non-connected stack in ${filePath}`)
+
     const camelCasePath = kebabToCamel(filePath.replace("/", "-"))
 
     const logGroup = new LogGroup(scope, `TSApiLambdaLog-${camelCasePath}${props.deployFor}`, {
@@ -479,6 +487,7 @@ const createLambda = <R extends ApiDefinition>(
             FB_SECRET_ARN: connectFirebase ? props.firebaseAdminConnect?.secret.secretArn : undefined,
             FB_DATABASE_NAME: connectFirebase ? props.firebaseAdminConnect?.internalDatabaseName : undefined,
             SECRETS_LIST: connectedSecrets ? props.secrets!.arns.join(",") : undefined,
+            TELEGRAF_SECRET_ARN: connectedTelegraf ? props.telegrafArn : undefined
         }
     } as NodejsFunctionProps;
 

@@ -37,6 +37,7 @@ describe("Testing the behaviour of the Typescript API construct for CDK", () => 
                     lambdaPath: "tests/lambda",
                     connectDatabase: false,
                     secrets: { arns: ["test"] },
+                    telegrafArn: "tgtest",
                     firebaseAdminConnect: {
                         secret,
                         internalDatabaseName: "db"
@@ -134,6 +135,16 @@ describe("Testing the behaviour of the Typescript API construct for CDK", () => 
                 "Environment": {
                     "Variables": {
                         "SECRETS_LIST": "test"
+                    }
+                }
+            })
+        )
+        template.hasResourceProperties("AWS::Lambda::Function",
+            Match.objectLike({
+                "Description": "Test Typescript API - /telegrafConnected (test)",
+                "Environment": {
+                    "Variables": {
+                        "TELEGRAF_SECRET_ARN": "tgtest"
                     }
                 }
             })
