@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Unreleased
 Handler prop event exceptionally accepts undefined value
 
+## 3.0.0-beta.3 - 2024-06-18
+
 ## 3.0.0-beta.2 - 2024-06-18
 Secrets management fix
 
