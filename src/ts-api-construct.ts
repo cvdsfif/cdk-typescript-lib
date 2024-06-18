@@ -207,13 +207,11 @@ export type TSApiProperties<T extends ApiDefinition> = {
     /**
      * If defined, lists the secrets to inject into the concerned lambdas
      */
-    secrets?: {
-        arns: string[] & { 0: string }
-    },
+    secrets?: Secret[] & { 0: Secret },
     /**
-     * If defined, creates a telegraf instance with the bot ID stored in the ARN passed to this field
+     * If defined, creates a telegraf instance with the bot ID stored in the secret passed to this field
      */
-    telegrafArn?: string
+    telegrafSecret?: Secret
 }
 
 /**
@@ -449,7 +447,7 @@ const createLambda = <R extends ApiDefinition>(
         throw new Error(`Trying to inject secrets on a stack without secrets`);
 
     const connectedTelegraf = connectedResourcesArray.includes(ConnectedResources.TELEGRAF.toString())
-    if (!props.telegrafArn && connectedTelegraf)
+    if (!props.telegrafSecret && connectedTelegraf)
         throw new Error(`Trying to connect telegraf to a lambda on a non-connected stack in ${filePath}`)
 
     const camelCasePath = kebabToCamel(filePath.replace("/", "-"))
@@ -486,8 +484,8 @@ const createLambda = <R extends ApiDefinition>(
             ACCESS_MASK: specificLambdaProperties?.accessMask ? JSON.stringify(specificLambdaProperties?.accessMask) : undefined,
             FB_SECRET_ARN: connectFirebase ? props.firebaseAdminConnect?.secret.secretArn : undefined,
             FB_DATABASE_NAME: connectFirebase ? props.firebaseAdminConnect?.internalDatabaseName : undefined,
-            SECRETS_LIST: connectedSecrets ? props.secrets!.arns.join(",") : undefined,
-            TELEGRAF_SECRET_ARN: connectedTelegraf ? props.telegrafArn : undefined
+            SECRETS_LIST: connectedSecrets ? props.secrets!.map(secret => secret.secretArn).join(",") : undefined,
+            TELEGRAF_SECRET_ARN: connectedTelegraf ? props.telegrafSecret?.secretArn : undefined
         }
     } as NodejsFunctionProps;
 
@@ -506,6 +504,8 @@ const createLambda = <R extends ApiDefinition>(
     )
 
     if (connectFirebase) props.firebaseAdminConnect?.secret.grantRead(lambda)
+    if (connectedSecrets) props.secrets?.forEach(secret => secret.grantRead(lambda))
+    if (connectedTelegraf) props.telegrafSecret?.grantRead(lambda)
 
     if (props.connectDatabase)
         connectLambdaToDatabase(database!, databaseSG!, lambda, lambdaProperties.securityGroups![0], props, camelCasePath);

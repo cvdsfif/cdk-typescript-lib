@@ -29,6 +29,8 @@ describe("Testing the behaviour of the Typescript API construct for CDK", () => 
             app, "TestedStack", props,
             (stack: Stack) => {
                 const secret = new Secret(stack, "TestSecret")
+                const injectedSecret = new Secret(stack, "InjectedSecret")
+                const telegrafSecret = new Secret(stack, "TelegrafSecret")
                 return new TSApiConstruct(stack, "SimpleApi", {
                     ...props,
                     apiName: "TSTestApi",
@@ -36,8 +38,8 @@ describe("Testing the behaviour of the Typescript API construct for CDK", () => 
                     apiMetadata: simpleApiWithFirebaseS.metadata,
                     lambdaPath: "tests/lambda",
                     connectDatabase: false,
-                    secrets: { arns: ["test"] },
-                    telegrafArn: "tgtest",
+                    secrets: [injectedSecret],
+                    telegrafSecret: telegrafSecret,
                     firebaseAdminConnect: {
                         secret,
                         internalDatabaseName: "db"
@@ -134,7 +136,9 @@ describe("Testing the behaviour of the Typescript API construct for CDK", () => 
                 "Description": "Test Typescript API - /secretsConnected (test)",
                 "Environment": {
                     "Variables": {
-                        "SECRETS_LIST": "test"
+                        "SECRETS_LIST": {
+                            "Ref": Match.stringLikeRegexp("InjectedSecret")
+                        }
                     }
                 }
             })
@@ -144,7 +148,9 @@ describe("Testing the behaviour of the Typescript API construct for CDK", () => 
                 "Description": "Test Typescript API - /telegrafConnected (test)",
                 "Environment": {
                     "Variables": {
-                        "TELEGRAF_SECRET_ARN": "tgtest"
+                        "TELEGRAF_SECRET_ARN": {
+                            "Ref": Match.stringLikeRegexp("TelegrafSecret")
+                        }
                     }
                 }
             })
