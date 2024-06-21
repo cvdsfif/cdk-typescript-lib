@@ -319,6 +319,41 @@ vpcProps: {
 }
 ```
 
+### Injecting connectors for Firebase, Telegram and AWS secrets
+
+The underlying `typizator-handler` library has the support for injecting to the API handlers connected resources for Firebase administration, Telegram bots and AWS secrets.
+
+#### Firebase administrator
+
+The Firebase administrative connector lets you send push notifications to mobile and web applications. To obtain a connector, you have to store your private key in an AWS secret that you create on your stack with a standard CDK's `Secret` construct.
+
+Once the secret created, you set up the Firebase connection in the properties of your stack:
+
+```ts
+firebaseAdminConnect: {
+    secret, // CDK construct refering to the secret
+    internalDatabaseName: "<url>" // URL of your Firebase database that you obtain in your Firebase console
+}
+```
+
+#### Telegraf
+
+You first have to create your bot through _BotFather_, then you store its token in an AWS secret refered by a CDK construct on your stack, then you simply add a reference to this secret to your stack's properties:
+
+```ts 
+telegrafSecret: secretRef // CDK construct refering to the secret
+```
+
+#### AWS Secrets
+
+You can create as many AWS secrets on your CDK stack, then put their references to the stack's properties:
+
+```ts
+secrets: [secret1, secret2] // CDK constructs refering to the secrets
+```
+
+In your handler, `HandlerProps` will contain a field with the contents of the listed secrets in the same order as above.
+
 ## Testing
 
 We never test the framework. So once your construct configured, you can consider that it should work as expected. You just need to make sure that the construction passes and there is something on the resulting stack.
