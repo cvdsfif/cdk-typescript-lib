@@ -40,7 +40,7 @@
     "constructs": "^10.3.0",
     "pg": "^8.11.5",
     "typizator": "^3.2.1",
-    "typizator-handler": "^3.0.0-beta.3"
+    "typizator-handler": "^3.0.0-beta.4"
   },
   "engines": {
     "node": ">=20.0.0"
