@@ -441,7 +441,7 @@ const createTelegrafSetupLambda = <R extends ApiDefinition>(
 
     let lambdaProperties = {
         code: new InlineCode(`
-            const setupHandler = require("cdk-typescript-lib/telegraf-setup-handler")
+            const setupHandler = require("cdk-typescript-lib")
             exports.handler = setupHandler.telegrafSetupHandler()
         `),
         handler: "index.handler",
