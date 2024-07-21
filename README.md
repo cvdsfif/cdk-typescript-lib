@@ -336,12 +336,31 @@ firebaseAdminConnect: {
 }
 ```
 
-#### Telegraf
+#### Telegram
 
-You first have to create your bot through _BotFather_, then you store its token in an AWS secret refered by a CDK construct on your stack, then you simply add a reference to this secret to your stack's properties:
+You first have to create your bot through _BotFather_, then you store its token in an AWS secret refered by a CDK construct on your stack, then you simply add a reference to this secret to your stack's properties of the lambda that will be the handler for that bot:
 
 ```ts 
-telegrafSecret: secretRef // CDK construct refering to the secret
+export const telegrafApiS = apiS({
+  proceedHandler: { args: [] }
+})
+
+export class ExampleStack extends Stack {
+  constructor(scope: Construct, id: string, props?: StackProps) {
+    super(scope, id, props)
+
+    const telegrafSecret = new Secret(this, "TelegrafExampleSecret", {
+      description: "Telegraf example Secret"
+    })
+
+    new TSApiConstruct(this, "TelegrafLibStack", {
+        // ...
+        lambdaPropertiesTree: {
+            proceedHandler: { telegrafSecret },
+        },
+    })
+  }
+}
 ```
 
 #### AWS Secrets
