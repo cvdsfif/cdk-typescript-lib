@@ -68,7 +68,7 @@ const cdkResponse = (
     LogicalResourceId: event.LogicalResourceId
 })
 
-const failureResponse = (
+export const failureResponse = (
     response: string,
     physicalResourceId: string,
     event: CloudFormationCustomResourceEvent
@@ -78,7 +78,7 @@ const failureResponse = (
     physicalResourceId, event
 )
 
-const successResponse = (
+export const successResponse = (
     response: string,
     physicalResourceId: string,
     event: CloudFormationCustomResourceEvent
@@ -118,11 +118,11 @@ export const postgresMigrationHandler =
                     let resourceId: string | null = null;
                     if (event.RequestType === "Create") {
                         await migrationProcessor.initialize(db)
-                        resourceId = `custom-${event.RequestId}`;
+                        resourceId = `custom-${event.RequestId}`
                     } else resourceId = event.PhysicalResourceId;
                     return await migrationUpdate(migrationProcessor, db, resourceId, event)
                 } finally {
-                    client.end();
+                    client.end()
                 }
             } catch (e: any) {
                 return failureResponse(

@@ -15,6 +15,7 @@ export const simpleApiWithFirebaseS = apiS({
     firebaseConnected: { args: [] },
     secretsConnected: { args: [] },
     telegrafConnected: { args: [] },
+    telegrafInline: { args: [] },
     helloWorld: { args: [stringS.notNull, bigintS.notNull], retVal: stringS.notNull },
     cruel: {
         world: { args: [stringS.notNull], retVal: stringS.notNull }

@@ -39,7 +39,7 @@ describe("Testing the behaviour of the Typescript API construct for CDK", () => 
                     lambdaPath: "tests/lambda",
                     connectDatabase: false,
                     secrets: [injectedSecret],
-                    telegrafSecret: telegrafSecret,
+                    telegrafSecret,
                     firebaseAdminConnect: {
                         secret,
                         internalDatabaseName: "db"
@@ -58,6 +58,9 @@ describe("Testing the behaviour of the Typescript API construct for CDK", () => 
                         ]
                     },
                     lambdaPropertiesTree: {
+                        telegrafInline: {
+                            telegrafSecret
+                        },
                         meow: {
                             schedules: [{
                                 cron: { minute: "0/1" }

@@ -2,7 +2,7 @@ import { CustomResource, Duration, RemovalPolicy, StackProps } from "aws-cdk-lib
 import { CorsHttpMethod, DomainName, HttpApi, HttpMethod } from "aws-cdk-lib/aws-apigatewayv2";
 import { HttpLambdaIntegration } from "aws-cdk-lib/aws-apigatewayv2-integrations";
 import { BastionHostLinux, ISecurityGroup, InstanceClass, InstanceSize, InstanceType, Peer, Port, SecurityGroup, SubnetType, Vpc, VpcProps } from "aws-cdk-lib/aws-ec2";
-import { Architecture, Code, LayerVersion, Runtime } from "aws-cdk-lib/aws-lambda";
+import { Architecture, Code, Function, FunctionProps, InlineCode, LayerVersion, Runtime } from "aws-cdk-lib/aws-lambda";
 import { BundlingOptions, NodejsFunction, NodejsFunctionProps } from "aws-cdk-lib/aws-lambda-nodejs";
 import { LogGroup, LogGroupProps, RetentionDays } from "aws-cdk-lib/aws-logs";
 import { Credentials, DatabaseInstance, DatabaseInstanceEngine, DatabaseInstanceProps, PostgresEngineVersion } from "aws-cdk-lib/aws-rds";
@@ -92,7 +92,8 @@ export type LambdaProperties = {
          * Stringified JSON object to send to the function as an argument
          */
         eventBody?: string
-    }]
+    }],
+    telegrafSecret?: Secret
 } & AccessProperties
 
 /**
@@ -210,6 +211,8 @@ export type TSApiProperties<T extends ApiDefinition> = {
     secrets?: Secret[] & { 0: Secret },
     /**
      * If defined, creates a telegraf instance with the bot ID stored in the secret passed to this field
+     * 
+     * @deprecated Telegraf connection are now managed at the individual API functions level
      */
     telegrafSecret?: Secret
 }
@@ -418,6 +421,69 @@ const connectLambdaToDatabase =
         )
     }
 
+const createTelegrafSetupLambda = <R extends ApiDefinition>(
+    scope: Construct,
+    props: TsApiGenericProperties<R> | InnerDependentApiProperties<R>,
+    telegrafSecret: Secret,
+    apiUrl: string,
+    sharedLayer: LayerVersion,
+    key: string,
+    filePath: string
+) => {
+    const camelCasePath = kebabToCamel(filePath.replace("/", "-"))
+    const tgSetupSuffix = "-tg-setup"
+
+    const logGroup = new LogGroup(scope, `TSApiLambdaLog-${camelCasePath}${tgSetupSuffix}${props.deployFor}`, {
+        removalPolicy: RemovalPolicy.DESTROY,
+        retention: RetentionDays.THREE_DAYS,
+        ...props.logGroupProps
+    })
+
+    let lambdaProperties = {
+        code: new InlineCode(`
+            const setupHandler = require("cdk-typescript-lib/telegraf-setup-handler")
+            exports.handler = setupHandler.telegrafSetupHandler()
+        `),
+        handler: "index.handler",
+        description: `TG setup for ${props.description} - ${apiUrl}/${key as string} (${props.deployFor})`,
+        runtime: DEFAULT_RUNTIME,
+        memorySize: 128,
+        architecture: DEFAULT_ARCHITECTURE,
+        timeout: Duration.seconds(30),
+        logGroup,
+        layers: [sharedLayer, ...(props.extraLayers ?? [])],
+        ...props.lambdaProps,
+        environment: {
+            ...props.lambdaProps?.environment,
+            TELEGRAF_SECRET_ARN: telegrafSecret.secretArn,
+            TELEGRAF_API_URL: apiUrl
+        }
+    } as FunctionProps
+
+    const lambda = new Function(
+        scope,
+        `TSApiLambda-${camelCasePath}${tgSetupSuffix}${props.deployFor}`,
+        lambdaProperties
+    )
+
+    telegrafSecret.grantRead(lambda)
+
+    const customResourceProvider = new Provider(
+        scope, `TelegrafSetupResourceProvider-${camelCasePath}-${props.deployFor}`, {
+        onEventHandler: lambda
+    })
+    const checksum = Buffer.from(apiUrl, "utf-8")
+        .reduce((accumulator, sym) => accumulator = (accumulator + BigInt(sym)) % (65536n ** 2n), 0n)
+    new CustomResource(
+        scope, `TelegrafSetupResource-${props.apiName}-${props.deployFor}`, {
+        serviceToken: customResourceProvider.serviceToken,
+        resourceType: "Custom::TelegramBotSetup",
+        properties: { Checksum: checksum.toString() }
+    })
+
+    return lambda
+}
+
 const createLambda = <R extends ApiDefinition>(
     scope: Construct,
     props: TsApiGenericProperties<R> | InnerDependentApiProperties<R>,
@@ -447,7 +513,7 @@ const createLambda = <R extends ApiDefinition>(
         throw new Error(`Trying to inject secrets on a stack without secrets`);
 
     const connectedTelegraf = connectedResourcesArray.includes(ConnectedResources.TELEGRAF.toString())
-    if (!props.telegrafSecret && connectedTelegraf)
+    if (!specificLambdaProperties?.telegrafSecret && !props.telegrafSecret && connectedTelegraf)
         throw new Error(`Trying to connect telegraf to a lambda on a non-connected stack in ${filePath}`)
 
     const camelCasePath = kebabToCamel(filePath.replace("/", "-"))
@@ -457,7 +523,7 @@ const createLambda = <R extends ApiDefinition>(
         retention: RetentionDays.THREE_DAYS,
         ...props.logGroupProps,
         ...specificLambdaProperties?.logGroupProps
-    });
+    })
 
     let lambdaProperties = {
         entry: `${filePath}.ts`,
@@ -485,7 +551,7 @@ const createLambda = <R extends ApiDefinition>(
             FB_SECRET_ARN: connectFirebase ? props.firebaseAdminConnect?.secret.secretArn : undefined,
             FB_DATABASE_NAME: connectFirebase ? props.firebaseAdminConnect?.internalDatabaseName : undefined,
             SECRETS_LIST: connectedSecrets ? props.secrets!.map(secret => secret.secretArn).join(",") : undefined,
-            TELEGRAF_SECRET_ARN: connectedTelegraf ? props.telegrafSecret?.secretArn : undefined
+            TELEGRAF_SECRET_ARN: specificLambdaProperties?.telegrafSecret?.secretArn ?? props.telegrafSecret?.secretArn
         }
     } as NodejsFunctionProps;
 
@@ -505,7 +571,8 @@ const createLambda = <R extends ApiDefinition>(
 
     if (connectFirebase) props.firebaseAdminConnect?.secret.grantRead(lambda)
     if (connectedSecrets) props.secrets?.forEach(secret => secret.grantRead(lambda))
-    if (connectedTelegraf) props.telegrafSecret?.grantRead(lambda)
+    specificLambdaProperties?.telegrafSecret?.grantRead(lambda)
+    props.telegrafSecret?.grantRead(lambda)
 
     if (props.connectDatabase)
         connectLambdaToDatabase(database!, databaseSG!, lambda, lambdaProperties.securityGroups![0], props, camelCasePath);
@@ -554,14 +621,25 @@ const connectLambda =
         const lambdaIntegration = new HttpLambdaIntegration(
             `Integration-${props.lambdaPath}-${keyKebabCase}-${subPath.replace("/", "-")}-${props.deployFor}`,
             lambda
-        );
+        )
         httpApi.addRoutes({
             integration: lambdaIntegration,
             methods: [HttpMethod.POST],
             path: `${subPath}/${keyKebabCase}`
-        });
+        })
 
-        return lambda;
+        if (specificLambdaProperties.telegrafSecret)
+            createTelegrafSetupLambda(
+                scope,
+                props,
+                specificLambdaProperties.telegrafSecret,
+                `${httpApi.url}/${subPath}/${keyKebabCase}`,
+                sharedLayer,
+                key,
+                filePath
+            )
+
+        return lambda
     }
 
 const fillLocalAccessProperties = (
