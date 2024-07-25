@@ -8,7 +8,7 @@ import { LogGroup, LogGroupProps, RetentionDays } from "aws-cdk-lib/aws-logs";
 import { Credentials, DatabaseInstance, DatabaseInstanceEngine, DatabaseInstanceProps, PostgresEngineVersion } from "aws-cdk-lib/aws-rds";
 import { Construct } from "constructs";
 import { ApiDefinition, ApiMetadata, NamedMetadata } from "typizator";
-import { ConnectedResources, PING } from "typizator-handler";
+import { ConnectedResources } from "typizator-handler";
 import { Provider } from "aws-cdk-lib/custom-resources";
 import { readFileSync } from "fs";
 import { CronOptions, Rule, RuleTargetInput, Schedule } from "aws-cdk-lib/aws-events";
@@ -17,6 +17,8 @@ import { ARecord, HostedZone, IHostedZone, RecordTarget } from "aws-cdk-lib/aws-
 import { Certificate, CertificateValidation } from "aws-cdk-lib/aws-certificatemanager";
 import { ApiGatewayv2DomainProperties } from "aws-cdk-lib/aws-route53-targets";
 import { Secret } from "aws-cdk-lib/aws-secretsmanager";
+
+const connectedTelegramWebhooks = new Set<string>()
 
 /**
  * Extended properties for the stack creation.
@@ -628,7 +630,7 @@ const connectLambda =
             path: `${subPath}/${keyKebabCase}`
         })
 
-        if (specificLambdaProperties.telegrafSecret)
+        if (specificLambdaProperties.telegrafSecret && !connectedTelegramWebhooks.has(specificLambdaProperties.telegrafSecret.secretArn)) {
             createTelegrafSetupLambda(
                 scope,
                 props,
@@ -638,6 +640,8 @@ const connectLambda =
                 key,
                 filePath
             )
+            connectedTelegramWebhooks.add(specificLambdaProperties.telegrafSecret.secretArn)
+        }
 
         return lambda
     }
