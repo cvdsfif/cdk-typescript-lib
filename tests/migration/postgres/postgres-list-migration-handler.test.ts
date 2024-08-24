@@ -8,15 +8,13 @@ jest.mock("@aws-sdk/client-secrets-manager", () => ({
 
 const queryFn = jest.fn()
 const endFn = jest.fn()
-jest.mock("pg", () => ({
-    Client: (jest.fn().mockImplementation((...args: any) => {
-        return {
-            connect: jest.fn(),
-            end: endFn,
-            query: queryFn,
-            on: jest.fn(),
-        }
-    }))
+jest.mock("serverless-postgres", () => jest.fn().mockImplementation((...args: any) => {
+    return {
+        connect: jest.fn(),
+        end: endFn,
+        query: queryFn,
+        on: jest.fn(),
+    }
 }))
 
 import { postgresListMigrationHandler } from "../../../src/migration/postgres/postgres-list-migration-handler"
