@@ -1,10 +1,10 @@
-import { Client } from "pg"
 import { PostgreSqlContainer } from "@testcontainers/postgresql"
 import { DatabaseConnection, connectDatabase } from "typizator-handler"
 import { MigrationProcessor } from "../../src/migration/postgres/postgres-migration-handler"
 import { PostgresListMigrationProcessor, databaseMigrationSchema } from "../../src/migration/postgres/postgres-list-migration-processor";
 import { migrationList } from "../../src/migration/migration-list";
 import { extendExpectWithToContainStrings } from "../util/expect-contain-strings";
+import ServerlessClient from "serverless-postgres"
 
 describe("Testing the migration tool for Postgres using a forward-only migrations list", () => {
     extendExpectWithToContainStrings()
@@ -26,7 +26,7 @@ describe("Testing the migration tool for Postgres using a forward-only migration
 
     beforeAll(async () => {
         const container = await new PostgreSqlContainer().withReuse().start()
-        const client = new Client({ connectionString: container.getConnectionUri() })
+        const client = new ServerlessClient({ connectionString: container.getConnectionUri() })
         client.connect()
         connection = connectDatabase(client);
         underTest = new PostgresListMigrationProcessor(basicMigrationList)

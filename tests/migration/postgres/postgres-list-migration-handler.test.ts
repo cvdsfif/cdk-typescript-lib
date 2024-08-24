@@ -13,7 +13,8 @@ jest.mock("pg", () => ({
         return {
             connect: jest.fn(),
             end: endFn,
-            query: queryFn
+            query: queryFn,
+            on: jest.fn(),
         }
     }))
 }))
